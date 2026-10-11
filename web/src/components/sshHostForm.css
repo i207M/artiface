@@ -1,0 +1,15 @@
+.ssh-host-form { display: flex; flex-direction: column; gap: 16px; margin-top: 20px; min-width: 0; }
+.ssh-host-form > p { margin: 0; }
+.ssh-host-form > fieldset { display: flex; flex-direction: column; gap: 14px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.ssh-host-form label { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-weight: 550; }
+.ssh-host-form input:not([type=radio]), .ssh-host-form textarea { width: 100%; min-width: 0; max-width: 100%; }
+.ssh-host-form textarea { resize: vertical; min-height: 8rem; max-height: 24rem; overflow-wrap: anywhere; font-family: var(--font-mono, monospace); }
+.ssh-host-form .field-help { margin-top: -8px; }
+.ssh-host-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(80px, 110px); gap: 14px; }
+.ssh-host-form .ssh-authentication { display: flex; flex-wrap: wrap; gap: 10px 20px; border: 0; padding: 0; margin: 0; min-width: 0; }
+.ssh-authentication legend { padding: 0; margin-bottom: 8px; font-weight: 550; }
+.ssh-host-form .ssh-authentication label { flex-direction: row; align-items: center; font-weight: 400; }
+.ssh-host-form details > label { margin-top: 12px; }
+.ssh-host-form details .field-help { display: block; margin-top: 6px; }
+.ssh-host-form summary { cursor: pointer; }
+@media (max-width: 440px) { .ssh-host-fields { grid-template-columns: minmax(0, 1fr); } }

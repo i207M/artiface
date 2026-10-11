@@ -1,0 +1,36 @@
+services:
+  artiface:
+    image: ${ARTIFACE_IMAGE:-ghcr.io/i207m/artiface:latest}
+    container_name: artiface
+    # Compose's default network is a private bridge.
+    # Docker publishes it only on localhost unless ARTIFACE_BIND_IP is changed.
+    ports:
+      - target: 8787
+        published: "8787"
+        host_ip: "${ARTIFACE_BIND_IP:-127.0.0.1}"
+        protocol: tcp
+    # These network defaults apply only when config.json is missing.
+    command: ["serve", "--config", "/data/config.json"]
+    environment:
+      ARTIFACE_LISTEN: 0.0.0.0:8787
+      ARTIFACE_APP_ORIGIN: ${ARTIFACE_APP_ORIGIN:-http://127.0.0.1:8787}
+      # Optional: set to "team" for multi-user deployments.
+      ARTIFACE_MODE: ${ARTIFACE_MODE:-personal}
+      ARTIFACE_DISABLE_SSH: ${ARTIFACE_DISABLE_SSH:-false}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    volumes:
+      - type: bind
+        source: ${ARTIFACE_DATA_DIR:-./data}
+        target: /data
+        bind:
+          create_host_path: false
+      # Optional: mount any folder you want to browse, read-only.
+      # Change the host source and add more mounts as needed.
+      # Then select /projects/reports as a localhost project in Artiface.
+      # - type: bind
+      #   source: /absolute/path/to/your/reports
+      #   target: /projects/reports
+      #   read_only: true
+      #   bind:
+      #     create_host_path: false

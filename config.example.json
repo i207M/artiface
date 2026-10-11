@@ -1,0 +1,30 @@
+{
+  "mode": "personal",
+  "listen": "127.0.0.1:8787",
+  "appOrigin": "",
+  "previewOrigin": "",
+  "passwordHash": "PLACEHOLDER: first startup creates a private configuration and real password hash; then add hosts like the example below",
+  "sessionHours": 12,
+  "hosts": [
+    {
+      "id": "local",
+      "label": "localhost",
+      "kind": "local",
+      "target": "",
+      "roots": []
+    },
+    {
+      "id": "artifacts",
+      "label": "Artifact host",
+      "target": "my-ssh-alias",
+      "roots": [
+        {
+          "id": "project",
+          "label": "Project artifacts",
+          "path": "/absolute/path/to/artifacts",
+          "trustedScripts": false
+        }
+      ]
+    }
+  ]
+}

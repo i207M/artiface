@@ -1,0 +1,25 @@
+.pdf-navigation { display: flex; flex-shrink: 0; }
+.pdf-page-total-compact { display: none; }
+.pdf-outline-trigger { display: flex; align-items: center; gap: 2px; min-height: var(--control-height); padding: 0; border-radius: 4px; color: var(--text); }
+.pdf-outline-trigger:hover:not(:disabled), .pdf-outline-trigger[aria-expanded="true"] { background: var(--hover); }
+.pdf-outline-trigger svg { flex-shrink: 0; }
+.pdf-navigation-panel { position: fixed; z-index: 30; width: 320px; max-height: min(65dvh, var(--popover-max-height, 65dvh)); overflow: auto; border: 1px solid var(--border); border-radius: 6px; padding: 6px; color: var(--text); background: var(--surface); font-size: 1rem; }
+.pdf-navigation-panel header { display: flex; justify-content: space-between; align-items: center; padding-left: 8px; }
+.pdf-navigation-panel header strong { font-weight: 600; }
+.pdf-overview-action { display: flex; gap: 8px; align-items: center; width: 100%; min-height: var(--row-height); padding: 7px 8px; border-bottom: 1px solid var(--line); margin-bottom: 4px; text-align: left; }
+.pdf-outline-list > button { display: block; width: 100%; min-height: var(--row-height); padding: 6px 8px 6px calc(8px + var(--outline-depth) * 12px); border-radius: 4px; text-align: left; overflow-wrap: anywhere; line-height: 1.4; }
+.pdf-outline-list > button[data-outline-depth="0"] { font-weight: 600; }
+.pdf-outline-list > button:hover:not(:disabled), .pdf-overview-action:hover { background: var(--hover); }
+.pdf-outline-message { margin: 0; padding: 10px 8px; line-height: 1.5; color: var(--muted); }
+.pdf-outline-message p { margin: 0 0 6px; }
+.pdf-return-page { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+html[data-density="compact"] .pdf-outline-list > button { padding-block: 3px; }
+.reader-expanded .pdf-navigation-panel, .reader-toolbars-hidden .pdf-navigation-panel { display: none; }
+@container pdf-reader (max-width: 700px) {
+  .pdf-return-page span { display: none; }
+  .pdf-page-total { display: none; }
+  .pdf-page-total-compact { display: inline; }
+}
+@container pdf-reader (max-width: 370px) {
+  .pdf-return-page { padding-inline: 3px; }
+}

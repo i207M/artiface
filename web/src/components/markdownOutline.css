@@ -1,0 +1,13 @@
+.markdown-outline-control { display: flex; flex-shrink: 0; }
+.markdown-outline-panel { position: fixed; z-index: 30; display: flex; flex-direction: column; width: min(360px, calc(100vw - 20px)); max-height: min(480px, 70dvh, var(--popover-max-height, 100dvh)); overflow: auto; overscroll-behavior: contain; padding: 6px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 7px; box-shadow: var(--shadow); font-size: 1rem; }
+.markdown-outline-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; padding: 0 4px 4px 8px; }
+.markdown-outline-panel nav { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.markdown-outline-panel ol { list-style: none; margin: 0; padding: 0; }
+.markdown-outline-panel a { display: block; padding: 8px 10px; min-height: var(--row-height); color: var(--text); line-height: 1.5; text-decoration: none; overflow-wrap: anywhere; border-radius: 4px; }
+.markdown-outline-panel a[data-outline-level="1"], .markdown-outline-panel a[data-outline-level="2"] { font-weight: 600; }
+html[data-density="compact"] .markdown-outline-panel a { padding-block: 4px; }
+.markdown-outline-panel a:hover { background: var(--hover); }
+.markdown-outline-panel a:focus-visible { outline-offset: -2px; }
+.markdown-outline-panel p { flex-shrink: 0; margin: 8px; line-height: 1.5; color: var(--muted); }
+.markdown-outline-note { border-top: 1px solid var(--line); padding-top: 8px; }
+.reader-expanded .markdown-outline-panel, .reader-toolbars-hidden .markdown-outline-panel { display: none; }

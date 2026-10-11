@@ -1,0 +1,28 @@
+.ssh-host-key-dialog {
+  width: min(540px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  overflow-wrap: anywhere;
+}
+.ssh-host-key-dialog::backdrop { background: #0008; }
+.ssh-host-key-dialog > p, .ssh-host-key-dialog > dl, .ssh-host-key-dialog > form { margin-top: 16px; }
+.ssh-host-key-details { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 8px 16px; }
+.ssh-host-key-details dt { color: var(--muted); }
+.ssh-host-key-details dd { min-width: 0; margin: 0; }
+.ssh-host-key-details code { display: block; font-family: var(--mono); white-space: normal; overflow-wrap: anywhere; user-select: text; }
+.ssh-host-key-details code + code { margin-top: 8px; }
+.ssh-host-key-password { display: grid; gap: 6px; }
+.ssh-host-key-password input { width: 100%; }
+.ssh-host-key-password small { color: var(--muted); }
+.ssh-host-key-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+@media (max-width: 400px) {
+  .ssh-host-key-dialog { padding: 16px; }
+  .ssh-host-key-details { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .ssh-host-key-details dd + dt { margin-top: 8px; }
+}

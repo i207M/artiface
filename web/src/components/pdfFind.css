@@ -1,0 +1,7 @@
+.pdf-toolbar.pdf-find-open { flex-wrap: wrap; }
+.pdf-find { flex: 1 0 100%; min-width: 0; padding-block: 3px; }
+.pdf-find-controls { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.pdf-find-controls > input { flex: 1; width: 0; min-width: 0; }
+.pdf-find-controls > button { flex-shrink: 0; }
+.pdf-find-status { padding-top: 3px; font-size: var(--small); overflow-wrap: anywhere; }
+.pdf-find-notice { display: block; }

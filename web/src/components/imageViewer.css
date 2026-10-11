@@ -1,0 +1,18 @@
+.preview-image .preview-content.content-render { display: flex; flex-direction: column; overflow: hidden; }
+.image-viewer.image-reader { position: relative; display: block; flex: 1; min-height: 0; min-width: 0; padding: 0; overflow: auto; overscroll-behavior: contain; overflow-anchor: none; background: var(--bg); }
+.image-reader[data-background="light"] .image-stage > img { background: #fff; }
+.image-reader[data-background="dark"] .image-stage > img { background: #202124; }
+.image-reader.can-pan { cursor: grab; }
+.image-reader.is-panning { cursor: grabbing; user-select: none; }
+.image-reader > .loading-state { position: absolute; inset: 0; }
+.image-reader > .error-state { min-height: 100%; }
+.image-stage { position: relative; overflow: hidden; }
+.image-stage > img { position: absolute; left: 50%; top: 50%; max-width: none; max-height: none; user-select: none; }
+.image-stage > img.pending-preview { inset: auto; left: 0; top: 0; width: 300px; height: auto; visibility: hidden; pointer-events: none; }
+.image-view-controls { display: grid; grid-template-columns: auto minmax(0, 5.5em) auto; align-items: center; gap: 2px; min-width: 0; max-width: 100%; }
+.image-view-controls select { width: 100%; min-width: 0; height: var(--control-height); padding: 2px 5px; font-variant-numeric: tabular-nums; }
+.image-view-options button span { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+@container reader-toolbar (max-width: 23rem) {
+  .image-view-controls { grid-template-columns: minmax(0, 5.5em); }
+  .image-view-controls > button { display: none; }
+}
