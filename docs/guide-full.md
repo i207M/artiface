@@ -164,7 +164,12 @@ Wide panes start side by side; narrow panes start inline.
 
 Open the Git menu in Browse and choose **View Git history** for a separate commit graph tab.
 The graph includes local branches, remote-tracking branches, tags, and HEAD without fetching from remotes.
-Select a commit to see its full message, author, date, parents, and copyable commit ID.
+Click a commit to expand its full message and changed files directly beneath the row.
+Changed files appear in a collapsible folder tree, with added, modified, deleted, and type-change badges.
+Merge commits show changes relative to their first parent.
+Open **Commit details**, collapsed by default, for the full hash, parents, author, committer, and dates.
+Select text in the history rows or expanded content and copy it normally.
+Use the row chevron, Enter, or Space to collapse an expanded commit.
 Use **Load older commits** to extend the graph, or **Refresh history** to see newer commits.
 If branch tips change between pages, refresh before loading more.
 Projects rooted in a repository subdirectory show history affecting that project.
@@ -187,6 +192,7 @@ The panel explains the pause and offers **Try again**.
 | Diff input | Skipped if either file version exceeds 8 MiB. |
 | Diff output | Partial-preview notice at 128 KiB, 2,000 lines, or 8 seconds. |
 | History | 100 commits per page, with a 2 MiB output limit and an 8-second timeout per read. |
+| Commit changes | Up to 2,000 changed files per preview, with the same 2 MiB and 8-second read limits. |
 
 Local inspection needs Git on the server; SSH inspection needs remote `git` and `timeout`.
 Git uses separate bounded SSH sessions, while ordinary file browsing reuses SFTP connections.

@@ -111,6 +111,23 @@ case "$2" in
       --skip="$offset" --max-count=101 -z \
       --format='%H%x00%P%x00%an%x00%ae%x00%aI%x00%B' -- "$@" 2>/dev/null
     ;;
+  commit)
+    [ "$(g cat-file -t "$3" 2>/dev/null)" = commit ] || exit 26
+    if [ -n "$prefix" ]; then
+      scoped=$(g log -1 --full-history --simplify-merges --parents --no-notes --no-show-signature --format=%H "$3" -- . 2>/dev/null) || exit 24
+      [ "$scoped" = "$3" ] || exit 26
+    fi
+    g log -1 -z --no-color --no-decorate --no-notes --no-show-signature --encoding=UTF-8 \
+      --format='%H%x00%P%x00%an%x00%ae%x00%aI%x00%cn%x00%ce%x00%cI%x00%B' "$3" -- 2>/dev/null || exit 24
+    parent=$(g rev-parse --verify "$3^1" 2>/dev/null) || parent=
+    if [ -n "$parent" ]; then
+      set -- "$parent" "$3"
+    else
+      set -- --root "$3"
+    fi
+    g diff-tree -r --no-commit-id --name-status -z --no-renames --no-ext-diff --no-textconv \
+      --ignore-submodules=none --relative "$@" -- . 2>/dev/null
+    ;;
   *) exit 24 ;;
 esac
 `
@@ -207,6 +224,8 @@ func (g GitReader) run(parent context.Context, target, root, operation, rel stri
 			return nil, ErrGitFilters
 		case 25:
 			return nil, ErrGitFileSize
+		case 26:
+			return nil, ErrGitCommit
 		case 124, 137:
 			return nil, ErrGitLimit
 		}

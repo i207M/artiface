@@ -41,13 +41,14 @@ type gitService struct {
 	read        func(context.Context, string, string) (storage.GitStatus, error)
 	readDiff    func(context.Context, string, string, string) (string, bool, error)
 	readHistory func(context.Context, string, string, int) (storage.GitHistory, error)
+	readCommit  func(context.Context, string, string, string) (storage.GitCommitDetails, error)
 }
 
 func newGitService() *gitService {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &gitService{cache: make(map[gitSource]gitStatusResponse), pending: make(map[gitSource]*gitCall),
 		slots: make(chan struct{}, 2), ctx: ctx, cancel: cancel, now: time.Now,
-		read: storage.ReadGitStatus, readDiff: storage.ReadGitDiff, readHistory: storage.ReadGitHistory}
+		read: storage.ReadGitStatus, readDiff: storage.ReadGitDiff, readHistory: storage.ReadGitHistory, readCommit: storage.ReadGitCommit}
 }
 
 func (g *gitService) status(parent context.Context, source gitSource, force bool) (gitStatusResponse, error) {

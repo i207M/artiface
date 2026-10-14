@@ -1,8 +1,7 @@
-import { Check, Copy, GitBranch, Maximize2, RefreshCw, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronRight, GitBranch, Maximize2, RefreshCw } from 'lucide-react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, KeyboardEvent } from 'react'
 import { api, apiURL, APIError, errorMessage, isAborted } from '../api'
-import { copyText } from '../clipboard'
 import { modifiedTime, relativeTime } from '../format'
 import { gitGraph } from '../gitGraph'
 import type { GitHistory, GraphRow } from '../gitGraph'
@@ -10,6 +9,7 @@ import type { FileLocation } from '../types'
 import { ErrorState, Loading, ShareButton } from './Common'
 import { useBrowseReaderFocusTarget } from './useBrowseReaderFocus'
 import type { BrowseReaderFocusRequest } from './useBrowseReaderFocus'
+import GitCommitDetails, { selectedTextWithin } from './GitCommitDetails'
 import './gitHistory.css'
 
 function Graph({ row, width }: { row: GraphRow; width: number }) {
@@ -23,6 +23,15 @@ function Graph({ row, width }: { row: GraphRow; width: number }) {
         d={`M${x(edge.from)},${top} C${x(edge.from)},${middle} ${x(edge.to)},${middle} ${x(edge.to)},${bottom}`} />
     })}
   </svg><span className={`git-graph-node git-lane-${row.color}`} style={{ left: x(row.column) }} /></span>
+}
+
+function GraphContinuation({ row, width }: { row: GraphRow; width: number }) {
+  const lanes = new Map(row.edges.filter(edge => edge.end === 'bottom').map(edge => [edge.to, edge.color]))
+  return <span className="git-graph git-graph-continuation" aria-hidden="true">
+    <svg width={width} height="100%" viewBox={`0 0 ${width} 40`} preserveAspectRatio="none">
+      {[...lanes].map(([column, color]) => <path key={column} className={`git-lane-${color}`} d={`M${14 + column * 18},0 V40`} />)}
+    </svg>
+  </span>
 }
 
 export default function GitHistoryViewer({ location, active, focusRequest, copied, onCopyLink, onExpand }: {
@@ -42,8 +51,8 @@ export default function GitHistoryViewer({ location, active, focusRequest, copie
   const [busy, setBusy] = useState(true)
   const [request, setRequest] = useState({ offset: 0, attempt: 0 })
   const [selected, setSelected] = useState<string | null>(null)
-  const [copiedHash, setCopiedHash] = useState('')
-  const [copyError, setCopyError] = useState('')
+  const [focused, setFocused] = useState<string | null>(null)
+  const expansionID = useId()
   const url = apiURL('git/history', { ...location, path: '' })
   useBrowseReaderFocusTarget(content, active ? focusRequest : null)
   useEffect(() => {
@@ -75,23 +84,23 @@ export default function GitHistoryViewer({ location, active, focusRequest, copie
   }, [active, url, request])
   const graph = useMemo(() => gitGraph(data?.commits ?? []), [data])
   const graphWidth = graph.columns * 18 + 12
-  const commit = data?.commits.find(item => item.hash === selected)
+  const focusedHash = data?.commits.some(item => item.hash === focused) ? focused : data?.commits[0]?.hash
   const retry = () => setRequest(value => ({ offset: needsRefresh ? 0 : value.offset, attempt: value.attempt + 1 }))
   function move(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.nativeEvent.isComposing ||
-      !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
-    const rows = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('.git-history-row'))
-    const index = rows.indexOf(event.target as HTMLButtonElement)
+    if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || event.nativeEvent.isComposing) return
+    const rows = Array.from(event.currentTarget.querySelectorAll<HTMLDivElement>('.git-history-row'))
+    const index = rows.indexOf(event.target as HTMLDivElement)
     if (index < 0) return
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      if (!event.repeat) setSelected(value => value === data!.commits[index].hash ? null : data!.commits[index].hash)
+      return
+    }
+    if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
     const next = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1
       : Math.max(0, Math.min(rows.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))
     rows[next].focus()
-    setSelected(data!.commits[next].hash)
-  }
-  async function copyHash(hash: string) {
-    setCopyError('')
-    try { await copyText(hash); setCopiedHash(hash) } catch { setCopyError('Could not copy. Select the commit ID below to copy it.') }
   }
   return <section className="file-preview git-history-preview" aria-label="Git history">
     <h1 className="sr-only">Git history</h1>
@@ -114,16 +123,29 @@ export default function GitHistoryViewer({ location, active, focusRequest, copie
               <div className="git-history-columns" aria-hidden="true"><span title="Graph"><GitBranch size={15} /></span><span>Commit</span><span className="git-history-author">Author</span><span className="git-history-date">Date</span><span>ID</span></div>
               <ol className="git-history-commits">
                 {data.commits.map((item, index) => <li key={item.hash}>
-                  <button className="git-history-row" data-commit={item.hash} aria-pressed={selected === item.hash}
-                    tabIndex={selected === item.hash || (!commit && index === 0) ? 0 : -1}
-                    onClick={() => { setSelected(item.hash); setCopyError('') }}
+                  <div className="git-history-row" data-commit={item.hash} role="button" aria-expanded={selected === item.hash}
+                    aria-controls={selected === item.hash ? expansionID : undefined}
+                    tabIndex={focusedHash === item.hash ? 0 : -1} onFocus={() => setFocused(item.hash)}
+                    onClick={event => {
+                      if (event.detail > 1 || selectedTextWithin(event.currentTarget)) return
+                      setSelected(item.hash)
+                    }}
                     title={`${item.message.split('\n')[0]}\n${item.author} · ${modifiedTime(item.date)}\n${item.hash}`}>
                     <Graph row={graph.rows[index]} width={graphWidth} />
                     <span className="git-history-subject">{item.refs.length > 0 && <span className="git-history-refs">{item.refs.map(ref => <span className={`git-ref${ref.startsWith('HEAD') ? ' is-head' : ''}`} key={ref}>{ref}</span>)}</span>}<span>{item.message.split('\n')[0] || '(No commit message)'}</span></span>
                     <span className="git-history-author">{item.author}</span>
                     <time className="git-history-date" dateTime={item.date}>{relativeTime(item.date)}</time>
-                    <code className="git-history-hash">{item.hash.slice(0, 8)}</code>
-                  </button>
+                    <span className="git-history-id"><code className="git-history-hash">{item.hash}</code><ChevronRight className="git-history-disclosure" size={14} aria-hidden="true"
+                      onClick={event => {
+                        event.stopPropagation()
+                        if (event.detail > 1 || selectedTextWithin(event.currentTarget.closest<HTMLDivElement>('.git-history-row')!)) return
+                        setSelected(value => value === item.hash ? null : item.hash)
+                      }} /></span>
+                  </div>
+                  {selected === item.hash && <section className="git-commit-expanded" id={expansionID} aria-label="Commit changes">
+                    <GraphContinuation row={graph.rows[index]} width={graphWidth} />
+                    <GitCommitDetails commit={item} location={location} active={active} />
+                  </section>}
                 </li>)}
               </ol>
             </>}
@@ -131,20 +153,6 @@ export default function GitHistoryViewer({ location, active, focusRequest, copie
               {data.hasMore && <button className="button secondary" disabled={busy || needsRefresh} onClick={() => setRequest(value => ({ offset: data.commits.length, attempt: value.attempt + 1 }))}>{busy ? 'Loading…' : 'Load older commits'}</button>}
             </div>
           </div>
-          {commit && <section className="git-commit-details" aria-label="Commit details">
-            <header><strong>{commit.message.split('\n')[0] || '(No commit message)'}</strong>
-              <button className="icon-button" aria-label="Close commit details" title="Close commit details" onClick={() => {
-                content.current?.querySelector<HTMLButtonElement>(`[data-commit="${commit.hash}"]`)?.focus()
-                setSelected(null)
-              }}><X size={17} /></button></header>
-            <div className="git-commit-identity"><code>{commit.hash}</code>
-              <button className="icon-button" aria-label="Copy commit ID" title={copiedHash === commit.hash ? 'Copied' : 'Copy commit ID'} onClick={() => void copyHash(commit.hash)}>{copiedHash === commit.hash ? <Check size={16} /> : <Copy size={16} />}</button></div>
-            {copyError && <p role="status">{copyError}</p>}
-            <p>{commit.author}{commit.email && <> &lt;{commit.email}&gt;</>} · {modifiedTime(commit.date)}</p>
-            {commit.refs.length > 0 && <div className="git-commit-refs">{commit.refs.map(ref => <span className="git-ref" key={ref}>{ref}</span>)}</div>}
-            {commit.parents.length > 0 && <p className="git-commit-parents">Parents: {commit.parents.map(hash => <code key={hash} title={hash}>{hash.slice(0, 8)}</code>)}</p>}
-            {commit.message.includes('\n') && <pre>{commit.message.slice(commit.message.indexOf('\n') + 1).trim()}</pre>}
-          </section>}
         </>}
     </div>
   </section>

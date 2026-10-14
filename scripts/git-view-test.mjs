@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { gitGraph } from '../web/src/gitGraph.ts'
 import { parseGitDiff, splitDiffLines } from '../web/src/gitDiff.ts'
+import { gitFileTree } from '../web/src/gitCommit.ts'
 
 // Diverging lanes, an octopus merge, an unrelated root, and a common ancestor.
 const commits = [
@@ -53,3 +54,17 @@ assert.deepEqual(parseGitDiff('Binary files a/image.png and b/image.png differ\n
 })
 assert.equal(parseGitDiff('@@ -1,0 +1,1 @@\n+<script>unsafe</script>\n').hunks[0].lines[0].text, '<script>unsafe</script>')
 console.log('PASS: Diff numbers, unbalanced replacements, zero-length hunks, missing newline, binary changes and literal source text')
+
+const files = [
+  { path: 'reports/src/new.py', status: 'A' }, { path: 'reports/data/results.csv', status: 'M' },
+  { path: 'reports', status: 'D' }, { path: '__proto__/safe.txt', status: 'A' },
+  { path: `${'nested/'.repeat(100)}deep.txt`, status: 'A' },
+]
+const tree = gitFileTree(files)
+const leaves = nodes => nodes.flatMap(node => node.status ? [{ path: node.path, status: node.status }] : leaves(node.children))
+assert.deepEqual(leaves(tree).sort((a, b) => a.path.localeCompare(b.path)), [...files].sort((a, b) => a.path.localeCompare(b.path)))
+assert(tree.some(node => node.name === 'reports' && node.status === 'D'), 'A replaced file disappeared behind its new directory')
+assert(tree.some(node => node.name === 'reports' && !node.status), 'Directory structure was lost')
+const depth = nodes => Math.max(0, ...nodes.map(node => 1 + depth(node.children)))
+assert(depth(tree) <= 33, 'Deep filenames created unbounded DOM nesting')
+console.log('PASS: Changed-file tree preserves nested paths, file/directory replacements, special names and deep paths')

@@ -31,6 +31,13 @@ const historyCommits = [
   [2, [1], 'Add report', []],
   [1, [], 'Initial commit', []],
 ].map(([number, parents, message, refs]) => ({ hash: hash(number), parents: parents.map(hash), message, refs, author: 'Fixture author', email: 'fixture@invalid', date: '2026-10-14T10:00:00Z' }))
+const commitDetails = commit => ({
+  ...commit, committer: 'Fixture committer', committerEmail: 'committer@invalid', commitDate: '2026-10-14T11:00:00Z',
+  files: commit.hash === hash(5) ? [] : [
+    { path: 'README.md', status: 'M' }, { path: 'reports/src/plot.py', status: 'A' },
+    { path: 'reports/data/metrics.csv', status: 'M' }, { path: 'reports/old.txt', status: 'D' },
+  ], truncated: false,
+})
 const bundle = await rolldown({
   cwd: web, input: 'fixture:git', platform: 'browser', logLevel: 'silent',
   transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': '"production"' } },
@@ -90,6 +97,7 @@ try {
   let heldStatus, heldDiff, holdStatus = true, holdDiff = false, oversizedDiff = false
   let checks = 0, diffs = 0, metadataReads = 0
   let historyReads = 0, historyChanged = false, holdHistory = false, heldHistory
+  let commitReads = 0, holdCommit = false, heldCommit
   let patch = 'diff --git a/notes.py b/notes.py\n@@ -1 +1 @@\n-before\n+<script>window.diffExecuted=true</script>\n'
   await context.route('**/*', route => {
     const url = new URL(route.request().url())
@@ -127,6 +135,11 @@ try {
       if (offset && historyChanged) return route.fulfill({ status: 409, json: { error: 'Branches changed while loading history. Refresh history to continue.' } })
       if (offset) assert.equal(url.searchParams.get('revision'), 'a'.repeat(64))
       body = { commits: offset ? historyCommits.slice(offset) : historyCommits.slice(0, 4), revision: 'a'.repeat(64), hasMore: !offset, scoped: false, head: hash(6) }
+    }
+    if (url.pathname === '/api/git/commit') {
+      commitReads++
+      if (holdCommit) { heldCommit = route; holdCommit = false; return }
+      body = commitDetails(historyCommits.find(commit => commit.hash === url.searchParams.get('commit')))
     }
     if (!body) errors.push(`Unexpected request: ${url.pathname}`)
     return route.fulfill({ status: body ? 200 : 404, contentType: 'application/json', body: JSON.stringify(body ?? {}) })
@@ -232,17 +245,82 @@ try {
   await expect(history.getByLabel('Commit history')).toBeFocused()
   await expect(history.locator('.git-graph-node').first()).toBeVisible()
   assert.match(page.url(), /view=history/)
+  assert.equal(commitReads, 0, 'Collapsed rows loaded changed files')
+  const firstRow = history.locator('.git-history-row').first()
+  const subject = firstRow.locator('.git-history-subject > span:last-child')
+  const subjectBox = await subject.boundingBox()
+  await page.mouse.move(subjectBox.x + 1, subjectBox.y + subjectBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(subjectBox.x + subjectBox.width + 1, subjectBox.y + subjectBox.height / 2, { steps: 12 })
+  await page.mouse.up()
+  assert.match(await page.evaluate(() => getSelection().toString()), /Merge feature/, 'Commit message cannot be selected by dragging')
+  await expect(firstRow).toHaveAttribute('aria-expanded', 'false')
+  assert.equal(commitReads, 0, 'Selecting text expanded the commit')
+  await page.evaluate(() => getSelection().removeAllRanges())
   await history.locator('.git-history-row').first().click()
-  await expect(history.getByRole('region', { name: 'Commit details' })).toContainText('<script>literal text</script>')
+  const expansion = history.getByRole('region', { name: 'Commit changes', exact: true })
+  const metadata = history.locator('.git-commit-metadata')
+  await expect(expansion.getByRole('list', { name: 'Changed files', exact: true })).toBeVisible()
+  await expect(expansion).toContainText('<script>literal text</script>')
+  assert(await firstRow.evaluate(row => row.nextElementSibling?.classList.contains('git-commit-expanded')), 'Commit did not expand directly below its row')
+  await expect(metadata).toHaveJSProperty('open', false)
+  await expect(metadata.getByText('Fixture committer <committer@invalid>', { exact: true })).toBeHidden()
+  await expect(expansion.getByText('Compared with first parent', { exact: true })).toBeVisible()
+  await expect(expansion.getByText('plot.py', { exact: true })).toBeVisible()
+  await expansion.locator('summary').getByText('reports', { exact: true }).click()
+  await expect(expansion.getByText('plot.py', { exact: true })).toBeHidden()
+  await expansion.locator('summary').getByText('reports', { exact: true }).click()
+  await expect(expansion.getByText('plot.py', { exact: true })).toBeVisible()
+  await firstRow.locator('.git-history-hash').dblclick()
+  assert.equal(await page.evaluate(() => getSelection().toString()), hash(6), 'Double-click did not select the complete commit ID')
+  await expect(firstRow).toHaveAttribute('aria-expanded', 'true')
+  await page.evaluate(() => {
+    window.nativeCopiedSelection = ''
+    document.addEventListener('copy', () => { window.nativeCopiedSelection = getSelection().toString() }, { once: true })
+  })
+  await page.keyboard.press('Control+c')
+  assert.equal(await page.evaluate(() => window.nativeCopiedSelection), hash(6), 'Native copy did not receive the selected ID')
+  const messageRects = await expansion.locator('.git-commit-message').evaluate(element => {
+    const range = document.createRange()
+    range.selectNodeContents(element)
+    return [...range.getClientRects()].filter(rect => rect.width > 0).map(rect => ({ x: rect.x, y: rect.y, width: rect.width, height: rect.height }))
+  })
+  const messageStart = messageRects[0], messageEnd = messageRects.at(-1)
+  await page.mouse.move(messageStart.x + 1, messageStart.y + messageStart.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(messageEnd.x + messageEnd.width + 1, messageEnd.y + messageEnd.height / 2, { steps: 12 })
+  await page.mouse.up()
+  assert.equal((await page.evaluate(() => getSelection().toString())).trimEnd(), historyCommits[0].message.trimEnd(), 'Full commit message cannot be selected by dragging')
+  await expect(firstRow).toHaveAttribute('aria-expanded', 'true')
+  await metadata.locator('summary').click()
+  await expect(metadata).toHaveJSProperty('open', true)
+  await expect(metadata.getByText('Fixture committer <committer@invalid>', { exact: true })).toBeVisible()
+  await expect(metadata.getByText(hash(5), { exact: true })).toBeVisible()
+  assert.equal(commitReads, 1, 'Opening metadata refetched the commit')
   await expect(history.locator('script')).toHaveCount(0)
-  await history.getByRole('button', { name: 'Copy commit ID', exact: true }).click()
-  assert.equal(await page.evaluate(() => window.copiedText), hash(6))
+  await expect(history.getByRole('button', { name: 'Copy commit ID', exact: true })).toHaveCount(0)
   await history.getByRole('button', { name: 'Share link', exact: true }).click()
   assert.match(await page.evaluate(() => window.copiedText), /view=history/)
   await history.locator('.git-history-row').first().focus()
   await page.keyboard.press('ArrowDown')
   await expect(history.locator('.git-history-row').nth(1)).toBeFocused()
-  await expect(history.getByRole('region', { name: 'Commit details' })).toContainText('Update main')
+  assert.equal(commitReads, 1, 'Arrow navigation fetched commit details before activation')
+  await page.keyboard.press('Enter')
+  await expect(expansion).toContainText('Update main')
+  await expect(expansion).toContainText('No file changes in this project.')
+  await expect(metadata).toHaveJSProperty('open', false)
+  await page.keyboard.press('Space')
+  await expect(expansion).toHaveCount(0)
+  holdCommit = true
+  await history.locator('.git-history-row').nth(2).click()
+  await expect.poll(() => Boolean(heldCommit)).toBe(true)
+  await history.locator('.git-history-row').nth(3).click()
+  await expect(expansion.getByRole('list', { name: 'Changed files', exact: true })).toBeVisible()
+  await heldCommit.fulfill({ json: { ...commitDetails(historyCommits[2]), files: [{ path: 'OBSOLETE-COMMIT.txt', status: 'A' }] } }).catch(() => {})
+  await expect(page.getByText('OBSOLETE-COMMIT.txt')).toHaveCount(0)
+  await expect(expansion).toContainText('Start feature')
+  await history.locator('.git-history-row').nth(3).locator('.git-history-disclosure').click()
+  await expect(expansion).toHaveCount(0)
   await history.getByRole('button', { name: 'Load older commits', exact: true }).click()
   await expect(history.locator('.git-history-row')).toHaveCount(6)
   await expect(history.getByRole('button', { name: 'Load older commits', exact: true })).toHaveCount(0)
@@ -274,6 +352,7 @@ try {
   await expect(history.getByRole('status')).toHaveCount(0)
   await expect(history.locator('.git-history-row')).toHaveCount(4)
   await history.locator('.git-history-row').first().click()
+  await expect(expansion.getByRole('list', { name: 'Changed files', exact: true })).toBeVisible()
   await page.screenshot({ path: join(artifacts, 'history-desktop.png') })
   for (const density of ['compact', 'comfortable']) for (const fontScale of [1, 1.4]) {
     await page.setViewportSize({ width: 320, height: 740 })
@@ -301,7 +380,7 @@ try {
   await strip.getByRole('button', { name: 'Close Git history', exact: true }).click()
   await expect(historyTab).toHaveCount(0)
   await navigate('one')
-  console.log('PASS history graph, commit details/copy, paging/ref changes, cache/restoration, Overview metadata isolation, stale requests and phone layout')
+  console.log('PASS selectable history, native copy, inline commit/file trees, collapsed metadata, stale detail requests, paging, restoration and phone layout')
 
   statuses.one = { state: 'paused', message: 'Git checks paused: size limit.', checkedAt: new Date().toISOString(), retryAt: new Date(Date.now() + 600_000).toISOString() }
   await page.getByRole('button', { name: 'Git status', exact: true }).click()
