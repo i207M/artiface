@@ -60,7 +60,7 @@ func WithSSHCredentials(runtime *sshvault.Runtime) Option {
 	return func(a *App) {
 		a.sshCredentials = runtime
 		reader := storage.GitReader{Remote: runtime.Run}
-		a.git.read, a.git.readDiff = reader.Status, reader.Diff
+		a.git.read, a.git.readDiff, a.git.readHistory = reader.Status, reader.Diff, reader.History
 	}
 }
 
@@ -137,6 +137,7 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("GET /api/list", a.auth(http.HandlerFunc(a.list)))
 	mux.Handle("GET /api/git/status", a.auth(http.HandlerFunc(a.gitStatus)))
 	mux.Handle("GET /api/git/diff", a.auth(http.HandlerFunc(a.gitDiff)))
+	mux.Handle("GET /api/git/history", a.auth(http.HandlerFunc(a.gitHistory)))
 	mux.Handle("GET /api/file-info", a.auth(http.HandlerFunc(a.stat)))
 	mux.Handle("GET /api/text", a.auth(http.HandlerFunc(a.text)))
 	mux.Handle("GET /api/file", a.auth(http.HandlerFunc(a.file)))

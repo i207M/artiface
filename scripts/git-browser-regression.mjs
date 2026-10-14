@@ -22,6 +22,15 @@ const status = (branch = 'main', changes = [
   { path: 'removed.txt', index: '.', worktree: 'D' }, { path: 'scratch', index: '?', worktree: '?', directory: true },
 ]) => ({ state: 'ready', branch, changes, checkedAt: new Date().toISOString(), retryAt: new Date(Date.now() + 30_000).toISOString() })
 const statuses = { one: status(), two: status('other-branch', []) }
+const hash = number => number.toString(16).repeat(40)
+const historyCommits = [
+  [6, [5, 4], 'Merge feature\n\nA complete merge message with <script>literal text</script>.', ['HEAD → main', 'origin/main']],
+  [5, [2], 'Update main', []],
+  [4, [3], 'Finish feature', ['feature', 'tag: v1']],
+  [3, [2], 'Start feature', []],
+  [2, [1], 'Add report', []],
+  [1, [], 'Initial commit', []],
+].map(([number, parents, message, refs]) => ({ hash: hash(number), parents: parents.map(hash), message, refs, author: 'Fixture author', email: 'fixture@invalid', date: '2026-10-14T10:00:00Z' }))
 const bundle = await rolldown({
   cwd: web, input: 'fixture:git', platform: 'browser', logLevel: 'silent',
   transform: { jsx: 'react-jsx', define: { 'process.env.NODE_ENV': '"production"' } },
@@ -60,7 +69,7 @@ const bundle = await rolldown({
 const { output } = await bundle.generate({ format: 'iife', codeSplitting: false })
 await bundle.close()
 const script = output.find(item => item.type === 'chunk').code
-const css = (await Promise.all(['components/git.css', 'components/settings.css', 'components/workspace.css', 'viewers.css', 'styles.css']
+const css = (await Promise.all(['components/git.css', 'components/gitHistory.css', 'components/gitDiff.css', 'components/settings.css', 'components/workspace.css', 'viewers.css', 'styles.css']
   .map(path => readFile(`${web}/src/${path}`, 'utf8')))).join('\n').replace(/@import[^;]+;/g, '')
 const browser = await (process.env.ARTIFACE_BROWSER === 'webkit' ? webkit : chromium).launch({ headless: true })
 try {
@@ -80,6 +89,7 @@ try {
   const errors = []
   let heldStatus, heldDiff, holdStatus = true, holdDiff = false, oversizedDiff = false
   let checks = 0, diffs = 0, metadataReads = 0
+  let historyReads = 0, historyChanged = false, holdHistory = false, heldHistory
   let patch = 'diff --git a/notes.py b/notes.py\n@@ -1 +1 @@\n-before\n+<script>window.diffExecuted=true</script>\n'
   await context.route('**/*', route => {
     const url = new URL(route.request().url())
@@ -110,11 +120,24 @@ try {
       if (holdDiff) { heldDiff = route; holdDiff = false; return }
       body = { patch, truncated: false }
     }
+    if (url.pathname === '/api/git/history') {
+      historyReads++
+      if (holdHistory) { heldHistory = route; holdHistory = false; return }
+      const offset = Number(url.searchParams.get('offset') || 0)
+      if (offset && historyChanged) return route.fulfill({ status: 409, json: { error: 'Branches changed while loading history. Refresh history to continue.' } })
+      if (offset) assert.equal(url.searchParams.get('revision'), 'a'.repeat(64))
+      body = { commits: offset ? historyCommits.slice(offset) : historyCommits.slice(0, 4), revision: 'a'.repeat(64), hasMore: !offset, scoped: false, head: hash(6) }
+    }
     if (!body) errors.push(`Unexpected request: ${url.pathname}`)
     return route.fulfill({ status: body ? 200 : 404, contentType: 'application/json', body: JSON.stringify(body ?? {}) })
   })
   const page = await context.newPage()
   page.on('pageerror', error => errors.push(error.message))
+  const settleLayout = () => page.evaluate(async () => {
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    await Promise.all(document.getAnimations().filter(animation => animation.effect?.getTiming().iterations !== Infinity)
+      .map(animation => animation.finished.catch(() => {})))
+  })
   const navigate = async (root, path = '') => page.evaluate(location => window.fixtureNavigate(location), { host: 'local', root, path, kind: 'directory' })
   await page.goto(`${origin}/#host=local&root=one&path=&kind=directory`)
   await expect(page.getByRole('table', { name: 'Directory contents' })).toBeVisible()
@@ -131,6 +154,14 @@ try {
   const viewer = page.locator('.reader-panel:not([hidden]) .git-diff-preview')
   await expect(diffTab).toHaveAttribute('aria-selected', 'true')
   await expect(viewer.getByLabel('File diff')).toContainText('<script>')
+  await expect(viewer.getByLabel('File diff')).toHaveAttribute('data-layout', 'split')
+  await expect(viewer.locator('.git-split-cell.diff-remove .git-line-number')).toHaveText('1')
+  await expect(viewer.locator('.git-split-cell.diff-add .git-line-number')).toHaveText('1')
+  await viewer.getByRole('button', { name: 'Inline diff', exact: true }).click()
+  await expect(viewer.getByLabel('File diff')).toHaveAttribute('data-layout', 'inline')
+  await expect(viewer.locator('.git-inline-row.diff-remove .git-line-number')).toHaveText(['1', ''])
+  await expect(viewer.locator('.git-inline-row.diff-add .git-line-number')).toHaveText(['', '1'])
+  assert.equal(diffs, 1, 'Switching diff layout refetched the patch')
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.locator('#project-sidebar').getByRole('button', { name: 'Open notes.py · Diff', exact: true })).toHaveAttribute('aria-current', 'page')
   assert(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('view') === 'diff')
@@ -191,6 +222,86 @@ try {
   await strip.getByRole('button', { name: 'Close removed.txt · Diff', exact: true }).click()
   await navigate('one')
   console.log('PASS safe diff tabs, separate file identity, sidebar/Overview, reload restoration, cache reuse, copy/share/fullscreen, deleted files and folder status reuse')
+
+  await page.getByRole('button', { name: 'Git status', exact: true }).click()
+  await page.getByRole('button', { name: 'View Git history', exact: true }).click()
+  const historyTab = strip.getByRole('tab', { name: 'Git history', exact: true })
+  const history = page.locator('.reader-panel:not([hidden]) .git-history-preview')
+  await expect(historyTab).toHaveAttribute('aria-selected', 'true')
+  await expect(history.locator('.git-history-row')).toHaveCount(4)
+  await expect(history.getByLabel('Commit history')).toBeFocused()
+  await expect(history.locator('.git-graph-node').first()).toBeVisible()
+  assert.match(page.url(), /view=history/)
+  await history.locator('.git-history-row').first().click()
+  await expect(history.getByRole('region', { name: 'Commit details' })).toContainText('<script>literal text</script>')
+  await expect(history.locator('script')).toHaveCount(0)
+  await history.getByRole('button', { name: 'Copy commit ID', exact: true }).click()
+  assert.equal(await page.evaluate(() => window.copiedText), hash(6))
+  await history.getByRole('button', { name: 'Share link', exact: true }).click()
+  assert.match(await page.evaluate(() => window.copiedText), /view=history/)
+  await history.locator('.git-history-row').first().focus()
+  await page.keyboard.press('ArrowDown')
+  await expect(history.locator('.git-history-row').nth(1)).toBeFocused()
+  await expect(history.getByRole('region', { name: 'Commit details' })).toContainText('Update main')
+  await history.getByRole('button', { name: 'Load older commits', exact: true }).click()
+  await expect(history.locator('.git-history-row')).toHaveCount(6)
+  await expect(history.getByRole('button', { name: 'Load older commits', exact: true })).toHaveCount(0)
+  const cachedHistoryReads = historyReads
+  await strip.getByRole('tab', { name: 'Browse', exact: true }).click()
+  await page.getByRole('button', { name: 'Git status', exact: true }).click()
+  await page.getByRole('button', { name: 'View Git history', exact: true }).click()
+  await expect(historyTab).toHaveCount(1)
+  await expect(history.locator('.git-history-row')).toHaveCount(6)
+  assert.equal(historyReads, cachedHistoryReads)
+  await page.reload()
+  await expect(historyTab).toHaveAttribute('aria-selected', 'true')
+  await expect(history.locator('.git-history-row')).toHaveCount(4)
+  assert.equal(historyReads, cachedHistoryReads + 1)
+  const historyMetadataReads = metadataReads
+  await page.getByRole('button', { name: /^Overview/ }).click()
+  const overviewHistory = page.locator('.overview-file').filter({ has: page.getByRole('button', { name: 'Open Git history', exact: true }) })
+  await expect(overviewHistory).toBeVisible()
+  await expect(overviewHistory.locator('.overview-modified')).toHaveCount(0)
+  assert.equal(metadataReads - historyMetadataReads, 1, 'History tab requested file metadata')
+  await overviewHistory.getByRole('button', { name: 'Open Git history', exact: true }).click()
+  await expect(history.locator('.git-history-row')).toHaveCount(4)
+  historyChanged = true
+  await history.getByRole('button', { name: 'Load older commits', exact: true }).click()
+  await expect(history.getByRole('status')).toContainText('Branches changed')
+  await expect(history.getByRole('button', { name: 'Load older commits', exact: true })).toBeDisabled()
+  historyChanged = false
+  await history.getByRole('status').getByRole('button', { name: 'Refresh history', exact: true }).click()
+  await expect(history.getByRole('status')).toHaveCount(0)
+  await expect(history.locator('.git-history-row')).toHaveCount(4)
+  await history.locator('.git-history-row').first().click()
+  await page.screenshot({ path: join(artifacts, 'history-desktop.png') })
+  for (const density of ['compact', 'comfortable']) for (const fontScale of [1, 1.4]) {
+    await page.setViewportSize({ width: 320, height: 740 })
+    await page.evaluate(options => window.fixturePreferences(options), { density, fontScale })
+    await settleLayout()
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'History overflowed the phone workspace')
+    assert(await history.evaluate(element => {
+      const box = element.getBoundingClientRect()
+      return box.left >= 0 && box.right <= innerWidth && box.width >= innerWidth - 1
+    }), 'History was obscured by a docked sidebar on the phone')
+    await expect(history.getByRole('button', { name: 'Refresh history', exact: true })).toBeVisible()
+  }
+  await page.screenshot({ path: join(artifacts, 'history-phone.png') })
+  await page.setViewportSize({ width: 1280, height: 850 })
+  await page.evaluate(() => window.fixturePreferences({ density: 'compact', fontScale: 1 }))
+  holdHistory = true
+  await history.getByRole('button', { name: 'Refresh history', exact: true }).click()
+  await expect.poll(() => Boolean(heldHistory)).toBe(true)
+  await navigate('two')
+  await heldHistory.fulfill({ json: { commits: [{ ...historyCommits[0], message: 'OBSOLETE HISTORY' }], revision: 'a'.repeat(64), hasMore: false, scoped: false } }).catch(() => {})
+  await expect(page.getByText('OBSOLETE HISTORY')).toHaveCount(0)
+  await navigate('one')
+  await historyTab.click()
+  await expect(history.locator('.git-history-row')).toHaveCount(4)
+  await strip.getByRole('button', { name: 'Close Git history', exact: true }).click()
+  await expect(historyTab).toHaveCount(0)
+  await navigate('one')
+  console.log('PASS history graph, commit details/copy, paging/ref changes, cache/restoration, Overview metadata isolation, stale requests and phone layout')
 
   statuses.one = { state: 'paused', message: 'Git checks paused: size limit.', checkedAt: new Date().toISOString(), retryAt: new Date(Date.now() + 600_000).toISOString() }
   await page.getByRole('button', { name: 'Git status', exact: true }).click()
@@ -273,6 +384,14 @@ try {
       for (const fontScale of [1, 1.4]) {
         await page.evaluate(options => window.fixturePreferences(options), { density, fontScale })
         await diffTab.click()
+        const controlsFit = await viewer.getByRole('toolbar').evaluate(toolbar => {
+          const box = toolbar.getBoundingClientRect()
+          return [...toolbar.querySelectorAll('button')].every(button => {
+            const rect = button.getBoundingClientRect()
+            return rect.left >= box.left && rect.right <= box.right
+          })
+        })
+        assert(controlsFit, `Diff controls overflow at ${width}px ${density} font ${fontScale}`)
         const previewHeight = await viewer.getByRole('toolbar').evaluate(element => element.getBoundingClientRect().height)
         await strip.getByRole('tab', { name: 'Browse', exact: true }).click()
         const heights = await page.locator('.browse-toolbar').evaluate(element => {
@@ -293,6 +412,13 @@ try {
   await expect(viewer.getByLabel('File diff')).toBeVisible()
   assert(await viewer.evaluate(element => element.getBoundingClientRect().width <= innerWidth))
   await page.screenshot({ path: join(artifacts, 'diff-phone-dark.png') })
+  await expect(viewer.getByLabel('File diff')).toHaveAttribute('data-layout', 'inline')
+  await viewer.getByRole('button', { name: 'Side-by-side diff', exact: true }).click()
+  await expect(viewer.getByLabel('File diff')).toHaveAttribute('data-layout', 'split')
+  assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Side-by-side diff overflowed the workspace')
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await settleLayout()
+  await page.screenshot({ path: join(artifacts, 'diff-split-desktop.png') })
   oversizedDiff = true
   await page.evaluate(() => window.fixtureNavigate({ host: 'local', root: 'one', path: 'large.pdf', kind: 'file', view: 'diff' }))
   await expect(strip.getByRole('tab', { name: 'large.pdf · Diff', exact: true })).toHaveAttribute('aria-selected', 'true')

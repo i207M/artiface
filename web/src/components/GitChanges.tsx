@@ -13,7 +13,7 @@ export function GitBadge({ mark, onClick, path }: { mark?: GitMark; onClick?: ()
     : <span {...props} aria-label={mark.label}>{mark.code}</span>
 }
 
-export default function GitChanges({ git, onDiff, onSettings }: { git: ReturnType<typeof useGitStatus>; onDiff: (path: string) => void; onSettings: () => void }) {
+export default function GitChanges({ git, onDiff, onHistory, onSettings }: { git: ReturnType<typeof useGitStatus>; onDiff: (path: string) => void; onHistory: () => void; onSettings: () => void }) {
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState('')
   const trigger = useRef<HTMLButtonElement>(null)
@@ -51,6 +51,9 @@ export default function GitChanges({ git, onDiff, onSettings }: { git: ReturnTyp
       <div className="git-panel-heading"><strong>{data?.branch || 'Git status'}</strong>
         <button className="icon-button" aria-label="Refresh Git status" title={checking ? 'Checking Git status…' : 'Check Git now'} aria-disabled={checking || undefined} onClick={() => { if (!checking) git.retry() }}><RefreshCw size={16} /></button>
       </div>
+      <button className="git-history-action" onClick={() => { trigger.current?.focus(); setOpen(false); onHistory() }}>
+        <GitBranch size={17} /><span>View Git history</span>
+      </button>
       {error && <p className="git-message" role="status">{error}</p>}
       {data?.message && <p className="git-message" role="status">{data.message}{data.state === 'paused' && <> Automatic retry at {new Date(data.retryAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.</>}</p>}
       {!data && !error && <p className="git-message" role="status">Checking Git status…</p>}

@@ -4,13 +4,14 @@ import type { FileLocation, Location } from './types'
 export function readLocation(): Location {
   const params = new URLSearchParams(window.location.hash.slice(1))
   const kind = params.get('kind')
+  const view = kind === 'file' && ['diff', 'history'].includes(params.get('view') ?? '') ? params.get('view') as FileLocation['view'] : undefined
   return {
     host: params.get('host') ?? '',
     root: params.get('root') ?? '',
-    path: params.get('path') ?? '',
+    path: view === 'history' ? '' : params.get('path') ?? '',
     kind: kind === 'directory' || kind === 'file' || kind === 'auto' || kind === 'overview' || kind === 'settings' || kind === 'add-project'
       ? kind : 'overview',
-    ...(kind === 'file' && params.get('view') === 'diff' ? { view: 'diff' as const } : {}),
+    ...(view ? { view } : {}),
   }
 }
 
@@ -18,9 +19,9 @@ export function locationHash(location: Location) {
   return `#${new URLSearchParams({
     host: location.host,
     root: location.root,
-    path: location.path,
+    path: location.view === 'history' && location.kind === 'file' ? '' : location.path,
     kind: location.kind,
-    ...(location.kind === 'file' && location.view === 'diff' ? { view: 'diff' } : {}),
+    ...(location.kind === 'file' && location.view ? { view: location.view } : {}),
   })}`
 }
 
@@ -56,6 +57,7 @@ export function fileName(path: string) {
 }
 
 export function fileTabName(file: FileLocation, fullPath = false) {
+  if (file.view === 'history') return 'Git history'
   return `${fullPath ? file.path : fileName(file.path)}${file.view === 'diff' ? ' · Diff' : ''}`
 }
 

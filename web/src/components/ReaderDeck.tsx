@@ -15,7 +15,7 @@ export default function ReaderDeck({ location, tabs, hosts, revision = '', rende
   render: (location: Location, host: Host, project: Project, active: boolean) => ReactNode
 }) {
   const [recent, setRecent] = useState<{ revision: string; items: FileLocation[] }>({ revision, items: [] })
-  const active = location.kind === 'file' && (location.view === 'diff' || fileKind(location.path) !== 'pdf') ? location : null
+  const active = location.kind === 'file' && (location.view || fileKind(location.path) !== 'pdf') ? location : null
   const next = (recent.revision === revision ? recent.items : []).filter(item => tabs.some(tab => tabKey(item) === tabKey(tab)) && (!active || tabKey(item) !== tabKey(active)))
   if (active) next.push(active)
   const retained = next.slice(-maxReaders)

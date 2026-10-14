@@ -1,0 +1,25 @@
+.git-diff-preview .git-diff-layout { flex-shrink: 0; padding: 1px; }
+.git-diff-layout button { gap: 5px; }
+.git-diff-table { width: 100%; font: 13px/1.6 var(--mono); tab-size: 4; }
+.git-diff-split { min-width: 600px; }
+.git-diff-labels { position: sticky; top: 0; z-index: 1; background: var(--surface-alt); border-bottom: 1px solid var(--border); color: var(--muted); font: 500 var(--small)/1.6 Inter, ui-sans-serif, system-ui, sans-serif; }
+.git-diff-labels span { padding: 6px 12px; }
+.git-diff-inline .git-diff-labels { padding: 6px 0; }
+.git-diff-hunk { padding: 5px 12px; color: var(--file-markdown); background: var(--surface-alt); border-block: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; }
+.git-inline-row { display: grid; grid-template-columns: 4em 4em 1.5em minmax(0, 1fr); }
+.git-split-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.git-split-cell { display: grid; grid-template-columns: 4em 1.5em minmax(0, 1fr); min-width: 0; }
+.git-split-cell + .git-split-cell, .git-diff-labels > span + span { border-left: 1px solid var(--border); }
+.git-line-number { padding-inline: 5px; color: var(--muted); text-align: right; user-select: none; font-variant-numeric: tabular-nums; background: color-mix(in srgb, var(--text) 3%, transparent); }
+.git-line-marker { text-align: center; color: var(--muted); user-select: none; }
+.git-diff-content .git-diff-code { margin: 0; padding: 0 12px 0 4px; min-width: 0; width: auto; min-height: 1.6em; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
+.git-diff-content .git-diff-code > .git-no-newline { display: block; padding: 0; color: var(--muted); font-style: italic; font-size: 11px; }
+.git-diff-content .git-diff-metadata { min-width: 0; width: auto; margin: 0; padding: 10px 12px; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
+.diff-empty { background: repeating-linear-gradient(135deg, var(--surface-alt), var(--surface-alt) 3px, var(--surface) 3px, var(--surface) 6px); }
+@media (max-width: 700px) {
+  .git-inline-row { grid-template-columns: 3em 3em 1.2em minmax(0, 1fr); }
+}
+@container reader-toolbar (max-width: 36rem) {
+  .git-diff-layout button { width: var(--control-height); padding-inline: 0; }
+  .git-diff-layout button span { display: none; }
+}

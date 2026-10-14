@@ -64,7 +64,7 @@ func TestSSHDisabledKeepsLocalProjectsAndCredentials(t *testing.T) {
 			if settings := readSettings(t, app, cookie); !settings.SSHDisabled {
 				t.Fatal("settings did not report disabled SSH")
 			}
-			for _, endpoint := range []string{"list", "text", "file", "file-info", "git/status", "git/diff", "pdf/page", "pdf/outline"} {
+			for _, endpoint := range []string{"list", "text", "file", "file-info", "git/status", "git/diff", "git/history", "pdf/page", "pdf/outline"} {
 				query := fileQuery("reports/report.pdf")
 				if strings.HasPrefix(endpoint, "pdf/") {
 					query += "&document=0123456789abcdef0123456789abcdef&page=1&size=960"

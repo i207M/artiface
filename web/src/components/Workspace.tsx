@@ -19,6 +19,7 @@ import FileSortButton from './FileSortButton'
 import FilePreview from './FilePreview'
 import GitChanges from './GitChanges'
 import GitDiffViewer from './GitDiffViewer'
+import GitHistoryViewer from './GitHistoryViewer'
 import { useGitStatus } from './useGitStatus'
 import CopyPathDialog from './CopyPathDialog'
 import ReaderDeck from './ReaderDeck'
@@ -150,6 +151,13 @@ export default function Workspace({ location, navigate, onLogout, canManage = tr
   function openGitDiff(path: string) {
     const origin = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const next: Location = { host: location.host, root: location.root, path, kind: 'file', view: 'diff' }
+    remember(next)
+    go(next)
+    readerFocus.begin(next, origin)
+  }
+  function openGitHistory() {
+    const origin = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    const next: Location = { host: location.host, root: location.root, path: '', kind: 'file', view: 'history' }
     remember(next)
     go(next)
     readerFocus.begin(next, origin)
@@ -702,7 +710,7 @@ export default function Workspace({ location, navigate, onLogout, canManage = tr
                           onBlur={() => { overviewSpace.current = null }}>
                           <FileTabIcon file={tab} />
                           <span className="overview-row-text"><strong>{fileTabName(tab)}</strong><span className={`overview-file-context${machine ? ' has-machine' : ''}`}><span className="overview-file-location"><bdi dir="ltr">{project.label}{parentPath(tab.path) && <> · {parentPath(tab.path)}</>}</bdi></span>{machine && <bdi className="overview-file-machine" dir="ltr"> · {machine}</bdi>}</span></span>
-                          <span className="overview-file-meta"><OverviewModified metadata={overviewMetadata[tabKey({ ...tab, view: undefined })]} />{tab.autoRefreshPaused && !tab.view && <Pause size={12} aria-label="Auto refresh paused"><title>Auto refresh paused</title></Pause>}</span>
+                          <span className="overview-file-meta">{tab.view !== 'history' && <OverviewModified metadata={overviewMetadata[tabKey({ ...tab, view: undefined })]} />}{tab.autoRefreshPaused && !tab.view && <Pause size={12} aria-label="Auto refresh paused"><title>Auto refresh paused</title></Pause>}</span>
                         </button>
                         <button className="icon-button overview-file-close" aria-label={machine ? `Close ${fileTabName(tab, true)} in ${identity}` : `Close ${fileTabName(tab)}`} title={`Close ${fileTabName(tab)}`} onClick={event => closeOverviewFile(event, tab)}><X size={14} /></button>
                       </article>)
@@ -727,7 +735,7 @@ export default function Workspace({ location, navigate, onLogout, canManage = tr
                             <span className="sr-only" id="browse-page-description" role="status">{pageDescription}</span>
                           </> : <span className="browse-entry-count" role="status">{entries === null ? '…' : `${filtered.length.toLocaleString()} ${filtered.length === 1 ? 'entry' : 'entries'}`}</span>)}
                           {directory && <button className="icon-button" aria-label="Up one directory" title="Parent folder" onClick={() => browse(location, parentPath(directory))}><ArrowUp size={16} /></button>}
-                          {gitEnabled && <GitChanges key={gitIdentity} git={git} onDiff={openGitDiff} onSettings={() => showSettings('sources')} />}
+                          {gitEnabled && <GitChanges key={gitIdentity} git={git} onDiff={openGitDiff} onHistory={openGitHistory} onSettings={() => showSettings('sources')} />}
                           <button className="icon-button" aria-label="Refresh files" title={listingPending ? 'Refreshing files…' : `Refresh files · also checked every ${preferences.autoRefreshSeconds}s`} aria-disabled={listingPending} aria-busy={listingPending} onClick={refreshListing}><RefreshCw size={16} className={listingPending && entries !== null ? 'spin' : undefined} /></button>
                           </div><div className="browse-controls-row">
                           <div className="filter-input browse-search" onFocus={event => {
@@ -772,6 +780,8 @@ export default function Workspace({ location, navigate, onLogout, canManage = tr
                         </div> : <FileList entries={filtered} location={location} onOpen={openEntry} view={preferences.browseView} sort={sort} onSort={changeSort} page={page} onPageChange={changePage} pageJump={mobilePageJump} sortControl={gridSort} flat={flatBrowse} compactHeader={phone} query={query} gitMark={gitEnabled ? git.mark : undefined} onGitDiff={openGitDiff} />}</BrowseResults>
                       </div>}
         <ReaderDeck location={location} tabs={tabs} hosts={projectsReady ? visibleHosts ?? [] : []} revision={catalogRevision} render={(file, _host, root, active) => {
+          if (file.view === 'history') return <GitHistoryViewer location={file} active={active} focusRequest={active ? readerFocus.request : null}
+            copied={active && copied} onCopyLink={copyLink} onExpand={enterFullscreen} />
           if (file.view === 'diff') return <GitDiffViewer location={file} active={active} focusRequest={active ? readerFocus.request : null}
             copied={active && copied} onCopyLink={copyLink} onCopyPath={() => copyFilePath(file, root)} onExpand={enterFullscreen} />
           const tab = tabs.find(tab => tabKey(tab) === tabKey(file))

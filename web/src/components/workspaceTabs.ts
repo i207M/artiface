@@ -5,7 +5,7 @@ import type { FileLocation, Host, Location } from '../types'
 import { browseSources, createBrowseDirectories } from './browseDirectories'
 
 const storageKey = 'artiface.workspace.v1'
-export interface OpenProject { host: string; root: string; directory: string | null; activePath: string | null; activeView?: 'diff'; expanded: boolean }
+export interface OpenProject { host: string; root: string; directory: string | null; activePath: string | null; activeView?: FileLocation['view']; expanded: boolean }
 export interface OpenFile extends FileLocation { autoRefreshPaused: boolean }
 interface WorkspaceSession { projects: OpenProject[]; tabs: OpenFile[] }
 type ProjectRef = Pick<OpenProject, 'host' | 'root'>
@@ -13,7 +13,7 @@ interface SharedProjects { projects: ProjectRef[]; sourcesRevision: string }
 interface ProjectChange { project: ProjectRef; open: boolean }
 const empty: WorkspaceSession = { projects: [], tabs: [] }
 export const projectKey = (project: { host: string; root: string }) => JSON.stringify([project.host, project.root])
-export const tabKey = (tab: FileLocation) => JSON.stringify([tab.host, tab.root, tab.path, ...(tab.view === 'diff' ? ['diff'] : [])])
+export const tabKey = (tab: FileLocation) => JSON.stringify([tab.host, tab.root, tab.path, ...(tab.view ? [tab.view] : [])])
 const validProject = (value: unknown): value is { host: string; root: string } =>
   Boolean(value && typeof value === 'object' && 'host' in value && typeof value.host === 'string' && value.host &&
     'root' in value && typeof value.root === 'string' && value.root)
@@ -24,15 +24,18 @@ function readSession(storageKey: string): WorkspaceSession {
     if (!value || typeof value !== 'object' || !Array.isArray(value.projects) || !Array.isArray(value.tabs)) return empty
     const tabs: OpenFile[] = []
     for (const tab of Array.isArray(value.tabs) ? value.tabs : []) {
-      if (!validProject(tab) || !('path' in tab) || typeof tab.path !== 'string' || !tab.path || tabs.some(item => tabKey(item) === tabKey(tab as FileLocation))) continue
-      if ('view' in tab && tab.view !== undefined && tab.view !== 'diff') continue
-      tabs.push({ host: tab.host, root: tab.root, path: tab.path, ...('view' in tab && tab.view === 'diff' ? { view: 'diff' as const } : {}), autoRefreshPaused: 'autoRefreshPaused' in tab && tab.autoRefreshPaused === true })
+      if (!validProject(tab) || !('path' in tab) || typeof tab.path !== 'string') continue
+      const view = 'view' in tab ? tab.view : undefined
+      if (view !== undefined && view !== 'diff' && view !== 'history') continue
+      if (view === 'history' ? tab.path !== '' : !tab.path) continue
+      if (tabs.some(item => tabKey(item) === tabKey(tab as FileLocation))) continue
+      tabs.push({ host: tab.host, root: tab.root, path: tab.path, ...(view ? { view } : {}), autoRefreshPaused: 'autoRefreshPaused' in tab && tab.autoRefreshPaused === true })
     }
     const projects: OpenProject[] = []
     for (const project of Array.isArray(value.projects) ? value.projects : []) {
       if (!validProject(project) || projects.some(item => projectKey(item) === projectKey(project))) continue
       const activePath = 'activePath' in project ? project.activePath : null
-      const activeView = 'activeView' in project && project.activeView === 'diff' ? 'diff' : undefined
+      const activeView = 'activeView' in project && (project.activeView === 'diff' || project.activeView === 'history') ? project.activeView : undefined
       projects.push({
         host: project.host, root: project.root,
         directory: 'directory' in project && typeof project.directory === 'string' ? project.directory : null,

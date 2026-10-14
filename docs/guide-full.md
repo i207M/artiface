@@ -153,12 +153,22 @@ Temporary preview URLs are bearer links scoped to the resolved file's parent dir
 They expire within 15 minutes and require a valid parent session; logging out revokes them.
 Use the app's **Share link**, rather than copying an iframe URL.
 
-## Git status and diffs
+## Git history, status and diffs
 
 Browse shows branch status and badges for changed files.
 Open a badge for a separate diff tab, or use the Git menu to include deleted files.
 A file and its diff can stay open together in the sidebar and Overview.
 Retained diff tabs reuse their content; **Refresh diff** checks for newer changes.
+Choose **Inline** or **Side by side** in the diff toolbar to compare changes with line numbers.
+Wide panes start side by side; narrow panes start inline.
+
+Open the Git menu in Browse and choose **View Git history** for a separate commit graph tab.
+The graph includes local branches, remote-tracking branches, tags, and HEAD without fetching from remotes.
+Select a commit to see its full message, author, date, parents, and copyable commit ID.
+Use **Load older commits** to extend the graph, or **Refresh history** to see newer commits.
+If branch tips change between pages, refresh before loading more.
+Projects rooted in a repository subdirectory show history affecting that project.
+History tabs remain available alongside files and diffs and are restored on reload.
 
 Diffs combine staged and unstaged changes against the last commit, with an empty baseline for untracked files or repositories without a commit.
 They are read-only and load on request; no staging, commits, checkout, hooks, external diff tools, or network fetches run.
@@ -176,6 +186,7 @@ The panel explains the pause and offers **Try again**.
 | Slow or large status | Pauses after 8 seconds, over 2,000 changes, or excess metadata output. |
 | Diff input | Skipped if either file version exceeds 8 MiB. |
 | Diff output | Partial-preview notice at 128 KiB, 2,000 lines, or 8 seconds. |
+| History | 100 commits per page, with a 2 MiB output limit and an 8-second timeout per read. |
 
 Local inspection needs Git on the server; SSH inspection needs remote `git` and `timeout`.
 Git uses separate bounded SSH sessions, while ordinary file browsing reuses SFTP connections.
@@ -214,7 +225,7 @@ Background tabs and hidden browser pages stop polling.
 Overview reads modification times with at most two requests in flight and does not download artifacts.
 
 Returning to a retained file preview shows its content first, then checks access and the file version unless refresh is paused.
-Diff tabs update only through **Refresh diff**.
+Diff and history tabs update only through their refresh buttons.
 Temporary update failures keep the last content visible with a notice; authorization failures remove affected content.
 Checks compare size, modification time, and mode, not a content hash.
 Use manual refresh for changes that preserve metadata or affect only a report's companion assets.
@@ -222,7 +233,7 @@ Text refresh tries to keep your position, PDF refresh keeps page/zoom where poss
 
 | Cache | Bound and lifetime |
 | --- | --- |
-| Non-PDF readers | Up to 8 recently viewed readers, including live HTML frames and diff tabs. |
+| Non-PDF readers | Up to 8 recently viewed readers, including live HTML frames, diff tabs, and Git history. |
 | Original PDFs | Up to 4 inactive documents and 64 MiB of source bytes; active documents and rendering use additional memory. |
 | Compressed pages in browser | Up to 24 images and 32 MiB of JPEG data. |
 | Server PDF snapshots | Up to 4 documents and 2 GiB combined; each PDF is limited to 1 GiB and 10,000 pages. |

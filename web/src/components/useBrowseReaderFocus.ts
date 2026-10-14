@@ -72,7 +72,7 @@ export function useBrowseReaderFocusTarget(content: RefObject<HTMLDivElement | n
       const unsupported = visible(root.querySelector<HTMLElement>('.unsupported-viewer'))
       const target = error ? visible(error.querySelector<HTMLElement>('button:not(:disabled),a[href]')) ?? root
         : unsupported ? visible(unsupported.querySelector<HTMLElement>('a[href]')) ?? root
-          : visible(root.querySelector<HTMLElement>('.source-scroll, .csv-scroll, .markdown-viewer, .git-diff-content[aria-busy="false"], .pdf-canvas-area[aria-busy="false"], iframe[aria-hidden="false"]'))
+          : visible(root.querySelector<HTMLElement>('.source-scroll, .csv-scroll, .markdown-viewer, .git-diff-content[aria-busy="false"], .git-history-list[aria-busy="false"], .pdf-canvas-area[aria-busy="false"], iframe[aria-hidden="false"]'))
             ?? (root.querySelector('.image-reader img:not(.pending-preview)') ? visible(root.querySelector<HTMLElement>('.image-reader')) : null)
       if (target) request.focus(target)
     }

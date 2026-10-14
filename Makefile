@@ -23,6 +23,7 @@ test:
 	node scripts/pdf-find-regression.mjs
 	node scripts/image-view-regression.mjs
 	node scripts/csv-test.mjs
+	node scripts/git-view-test.mjs
 
 browser-test:
 	node scripts/ssh-host-key-regression.mjs

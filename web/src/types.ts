@@ -39,7 +39,7 @@ export interface FileLocation {
   host: string
   root: string
   path: string
-  view?: 'diff'
+  view?: 'diff' | 'history'
 }
 
 export interface TextResponse {

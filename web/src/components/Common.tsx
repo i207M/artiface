@@ -1,4 +1,4 @@
-import { AlertCircle, Braces, Check, File, FileCode2, FileDiff, FileImage, FileSymlink, FileText, Folder, FolderSymlink, Globe, LoaderCircle, NotebookPen, RefreshCw, Share2, Table2, Unlink2 } from 'lucide-react'
+import { AlertCircle, Braces, Check, File, FileCode2, FileDiff, FileImage, FileSymlink, FileText, Folder, FolderSymlink, GitBranch, Globe, LoaderCircle, NotebookPen, RefreshCw, Share2, Table2, Unlink2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { Entry, FileLocation } from '../types'
 import { isBinaryFile, readerType } from './fileTypes'
@@ -45,6 +45,7 @@ export function ProjectFolderIcon({ expanded }: { expanded: boolean }) {
 }
 
 export function FileTabIcon({ file }: { file: FileLocation }) {
+  if (file.view === 'history') return <GitBranch size={18} className="file-icon kind-code" />
   return file.view === 'diff' ? <FileDiff size={18} className="file-icon kind-code" /> : <EntryIcon entry={{ type: 'file', path: file.path }} />
 }
 

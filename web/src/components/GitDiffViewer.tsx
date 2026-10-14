@@ -1,4 +1,4 @@
-import { Copy, Maximize2, RefreshCw } from 'lucide-react'
+import { Columns2, Copy, Maximize2, RefreshCw, Rows3 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { api, apiURL, APIError, errorMessage, isAborted } from '../api'
 import { fileTabName } from '../location'
@@ -6,6 +6,7 @@ import type { FileLocation } from '../types'
 import { ErrorState, Loading, ShareButton } from './Common'
 import { useBrowseReaderFocusTarget } from './useBrowseReaderFocus'
 import type { BrowseReaderFocusRequest } from './useBrowseReaderFocus'
+import GitDiffContent from './GitDiffContent'
 import './git.css'
 
 interface Diff { patch: string; truncated: boolean }
@@ -26,8 +27,18 @@ export default function GitDiffViewer({ location, active, focusRequest, copied, 
   const [retryable, setRetryable] = useState(true)
   const [busy, setBusy] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  const [layout, setLayout] = useState<'inline' | 'split' | null>(null)
+  const [wide, setWide] = useState(false)
+  const shownLayout = layout ?? (wide ? 'split' : 'inline')
   const url = apiURL('git/diff', location)
   useBrowseReaderFocusTarget(content, active ? focusRequest : null)
+  useEffect(() => {
+    const element = content.current
+    if (!element) return
+    const observer = new ResizeObserver(() => setWide(element.clientWidth >= 720))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
   useEffect(() => {
     const key = JSON.stringify([url, attempt])
     if (!active || loaded.current === key) { setBusy(false); return }
@@ -51,7 +62,10 @@ export default function GitDiffViewer({ location, active, focusRequest, copied, 
   return <section className="file-preview git-diff-preview" aria-label={fileTabName(location)}>
     <h1 className="sr-only">{fileTabName(location)}</h1>
     <div className="preview-toolbar" id={active ? 'reader-toolbar' : undefined} role="toolbar" aria-label="Reader toolbar">
-      <span className="git-diff-caption">Working tree changes</span>
+      <div className="view-toggle git-diff-layout" aria-label="Diff layout">
+        <button className={shownLayout === 'inline' ? 'active' : ''} aria-label="Inline diff" title="Inline diff" aria-pressed={shownLayout === 'inline'} onClick={() => setLayout('inline')}><Rows3 size={15} /><span>Inline</span></button>
+        <button className={shownLayout === 'split' ? 'active' : ''} aria-label="Side-by-side diff" title="Side-by-side diff" aria-pressed={shownLayout === 'split'} onClick={() => setLayout('split')}><Columns2 size={15} /><span>Side by side</span></button>
+      </div>
       <div className="file-actions">
         <button className={`icon-button preview-reload${busy ? ' is-refreshing' : ''}`} aria-label="Refresh diff" title="Refresh diff" aria-disabled={busy}
           onClick={() => { if (!busy) setAttempt(value => value + 1) }}><RefreshCw size={17} /></button>
@@ -64,10 +78,7 @@ export default function GitDiffViewer({ location, active, focusRequest, copied, 
     <div ref={content} className="preview-content content-diff" tabIndex={-1}>
       {error ? <ErrorState title="Couldn’t load this diff" message={error} retry={retryable ? () => setAttempt(value => value + 1) : undefined} />
         : !data ? <Loading message="Loading diff…" />
-          : <div className="git-diff-content" tabIndex={0} aria-label="Git diff" aria-busy={busy}>
-            {!data.patch ? <p className="git-message">No textual changes to display.</p>
-              : <pre aria-label="File diff">{data.patch.split('\n').map((line, index) => <span key={index} className={line.startsWith('@@') ? 'diff-hunk' : line.startsWith('+') && !line.startsWith('+++') ? 'diff-add' : line.startsWith('-') && !line.startsWith('---') ? 'diff-remove' : undefined}>{line}{'\n'}</span>)}</pre>}
-          </div>}
+          : <div className="git-diff-content" tabIndex={0} aria-label="Git diff" aria-busy={busy}><GitDiffContent patch={data.patch} layout={shownLayout} /></div>}
     </div>
   </section>
 }

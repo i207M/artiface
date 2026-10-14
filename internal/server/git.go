@@ -31,22 +31,23 @@ type gitCall struct {
 	err  error
 }
 type gitService struct {
-	mu       sync.Mutex
-	cache    map[gitSource]gitStatusResponse
-	pending  map[gitSource]*gitCall
-	slots    chan struct{}
-	ctx      context.Context
-	cancel   context.CancelFunc
-	now      func() time.Time
-	read     func(context.Context, string, string) (storage.GitStatus, error)
-	readDiff func(context.Context, string, string, string) (string, bool, error)
+	mu          sync.Mutex
+	cache       map[gitSource]gitStatusResponse
+	pending     map[gitSource]*gitCall
+	slots       chan struct{}
+	ctx         context.Context
+	cancel      context.CancelFunc
+	now         func() time.Time
+	read        func(context.Context, string, string) (storage.GitStatus, error)
+	readDiff    func(context.Context, string, string, string) (string, bool, error)
+	readHistory func(context.Context, string, string, int) (storage.GitHistory, error)
 }
 
 func newGitService() *gitService {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &gitService{cache: make(map[gitSource]gitStatusResponse), pending: make(map[gitSource]*gitCall),
 		slots: make(chan struct{}, 2), ctx: ctx, cancel: cancel, now: time.Now,
-		read: storage.ReadGitStatus, readDiff: storage.ReadGitDiff}
+		read: storage.ReadGitStatus, readDiff: storage.ReadGitDiff, readHistory: storage.ReadGitHistory}
 }
 
 func (g *gitService) status(parent context.Context, source gitSource, force bool) (gitStatusResponse, error) {

@@ -43,7 +43,7 @@ type GitStatus struct {
 // Only these fixed, read-only operations are exposed.
 // Custom filters and partial clones are excluded: inspecting them can run
 // repository-defined programs or fetch objects. No repository helper is needed
-// for an ordinary status or text diff.
+// for an ordinary status, text diff, or history read.
 const gitScript = `
 cd "$1" 2>/dev/null || exit 24
 g() {
@@ -92,6 +92,25 @@ case "$2" in
     result=$?
     [ "$result" -le 1 ]
     ;;
+  history)
+    offset=$3
+    refs=$(g for-each-ref --format='%(objectname) %(*objectname) %(refname)' refs/heads refs/remotes refs/tags) || exit 24
+    head=$(g rev-parse --verify HEAD 2>/dev/null) || head=
+    branch=$(g symbolic-ref -q HEAD 2>/dev/null) || branch=
+    printf '%s\000%s\000%s\000%s\000' "$prefix" "$head" "$branch" "$refs"
+    [ -n "$head$refs" ] || exit 0
+    set --
+    [ -z "$prefix" ] || set -- .
+    {
+      [ -z "$head" ] || printf '%s\n' "$head"
+      printf '%s\n' "$refs" | while read -r object rest; do
+        [ -z "$object" ] || printf '%s\n' "$object"
+      done
+    } | g log --stdin --topo-order --full-history --simplify-merges --parents \
+      --no-color --no-decorate --no-notes --no-show-signature --encoding=UTF-8 \
+      --skip="$offset" --max-count=101 -z \
+      --format='%H%x00%P%x00%an%x00%ae%x00%aI%x00%B' -- "$@" 2>/dev/null
+    ;;
   *) exit 24 ;;
 esac
 `
@@ -101,21 +120,23 @@ func shellArgument(value string) string {
 }
 
 type gitOutput struct {
-	bytes.Buffer
+	buffer bytes.Buffer
 	limit  int
 	cancel context.CancelFunc
 	large  bool
 }
 
+func (w *gitOutput) Bytes() []byte { return w.buffer.Bytes() }
+
 func (w *gitOutput) Write(p []byte) (int, error) {
 	length := len(p)
-	remaining := w.limit - w.Len()
+	remaining := w.limit - w.buffer.Len()
 	if len(p) > remaining {
 		p = p[:remaining]
 		w.large = true
 		w.cancel()
 	}
-	_, _ = w.Buffer.Write(p)
+	_, _ = w.buffer.Write(p)
 	return length, nil
 }
 
