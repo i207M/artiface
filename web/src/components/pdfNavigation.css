@@ -1,6 +1,6 @@
 .pdf-navigation { display: flex; flex-shrink: 0; }
 .pdf-page-total-compact { display: none; }
-.pdf-outline-trigger { display: flex; align-items: center; gap: 2px; min-height: var(--control-height); padding: 0; border-radius: 4px; color: var(--text); }
+.pdf-outline-trigger { display: flex; align-items: center; gap: 6px; min-height: var(--control-height); padding: 0 8px; border-radius: 4px; color: var(--text); }
 .pdf-outline-trigger:hover:not(:disabled), .pdf-outline-trigger[aria-expanded="true"] { background: var(--hover); }
 .pdf-outline-trigger svg { flex-shrink: 0; }
 .pdf-navigation-panel { position: fixed; z-index: 30; width: 320px; max-height: min(65dvh, var(--popover-max-height, 65dvh)); overflow: auto; border: 1px solid var(--border); border-radius: 6px; padding: 6px; color: var(--text); background: var(--surface); font-size: 1rem; }
@@ -20,6 +20,10 @@ html[data-density="compact"] .pdf-outline-list > button { padding-block: 3px; }
   .pdf-page-total { display: none; }
   .pdf-page-total-compact { display: inline; }
 }
+@container pdf-reader (max-width: 440px) {
+  .pdf-outline-trigger { gap: 4px; padding-inline: 2px; }
+}
 @container pdf-reader (max-width: 370px) {
+  .pdf-outline-trigger { gap: 3px; padding-inline: 1px; }
   .pdf-return-page { padding-inline: 3px; }
 }
