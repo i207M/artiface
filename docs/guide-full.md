@@ -178,7 +178,7 @@ Tabs for different commits remain separate from each other and from working-tree
 Merge commits show changes relative to their first parent.
 Open **Commit details**, collapsed by default, for the full hash, parents, author, committer, and dates.
 Select text in the history rows or expanded content and copy it normally.
-Use the row chevron, Enter, or Space to collapse an expanded commit.
+Click the commit row again, use its chevron, or press Enter or Space to collapse it.
 Use **Load older commits** to extend the graph, or **Refresh history** to see newer commits.
 If branch tips change between pages, refresh before loading more.
 Projects rooted in a repository subdirectory show history affecting that project.

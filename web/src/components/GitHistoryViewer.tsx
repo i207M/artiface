@@ -129,7 +129,7 @@ export default function GitHistoryViewer({ location, active, focusRequest, copie
                     tabIndex={focusedHash === item.hash ? 0 : -1} onFocus={() => setFocused(item.hash)}
                     onClick={event => {
                       if (event.detail > 1 || selectedTextWithin(event.currentTarget)) return
-                      setSelected(item.hash)
+                      setSelected(value => value === item.hash ? null : item.hash)
                     }}
                     title={`${item.message.split('\n')[0]}\n${item.author} · ${modifiedTime(item.date)}\n${item.hash}`}>
                     <Graph row={graph.rows[index]} width={graphWidth} />
