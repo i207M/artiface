@@ -47,11 +47,11 @@ const bundle = await rolldown({
       }
       if (id === join(web, 'src/components/workspaceTabs.ts')) {
         const source = await readFile(id, 'utf8')
-        const idlePoll = 'succeeded && pending.current.size ? 0 : 5000'
+        const idlePoll = 'succeeded && (pending.current.size || pendingMoves.current.length) ? 0 : 5000'
         assert(source.includes(idlePoll), 'Update the fixture for the current shared-project polling schedule')
         // Background sync is covered separately; keep it outside the resize/focus measurements.
         // Initial, explicit, and pending-write synchronization still run normally.
-        return source.replace(idlePoll, 'succeeded && pending.current.size ? 0 : 300_000')
+        return source.replace(idlePoll, 'succeeded && (pending.current.size || pendingMoves.current.length) ? 0 : 300_000')
       }
       if (id === '\0fixture') return `
         import React, {StrictMode} from 'react'

@@ -9,6 +9,7 @@ export interface OpenProject { host: string; root: string; directory: string | n
 export interface OpenFile extends FileLocation { autoRefreshPaused: boolean }
 interface WorkspaceSession { projects: OpenProject[]; tabs: OpenFile[] }
 type ProjectRef = Pick<OpenProject, 'host' | 'root'>
+interface ProjectMove { project: ProjectRef; target: ProjectRef; edge: 'before' | 'after' }
 interface SharedProjects { projects: ProjectRef[]; sourcesRevision: string }
 interface ProjectChange { project: ProjectRef; open: boolean }
 const empty: WorkspaceSession = { projects: [], tabs: [] }
@@ -17,6 +18,14 @@ export const tabKey = (tab: FileLocation) => JSON.stringify([tab.host, tab.root,
 const validProject = (value: unknown): value is { host: string; root: string } =>
   Boolean(value && typeof value === 'object' && 'host' in value && typeof value.host === 'string' && value.host &&
     'root' in value && typeof value.root === 'string' && value.root)
+
+function moveProject<T extends ProjectRef>(projects: T[], move: ProjectMove): T[] {
+  const source = projects.find(project => projectKey(project) === projectKey(move.project))
+  if (!source || projectKey(move.project) === projectKey(move.target) || !projects.some(project => projectKey(project) === projectKey(move.target))) return projects
+  const next = projects.filter(project => project !== source)
+  next.splice(next.findIndex(project => projectKey(project) === projectKey(move.target)) + (move.edge === 'after' ? 1 : 0), 0, source)
+  return next.every((project, index) => project === projects[index]) ? projects : next
+}
 
 function readSession(storageKey: string): WorkspaceSession {
   try {
@@ -58,6 +67,7 @@ export function useWorkspaceTabs(hosts: Host[] | null, userID?: string) {
   const [syncError, setSyncError] = useState('')
   const [sourcesRevision, setSourcesRevision] = useState('')
   const pending = useRef(new Map<string, ProjectChange>())
+  const pendingMoves = useRef<ProjectMove[]>([])
   const syncNow = useRef<() => void>(() => {})
   const stopSync = useRef<() => void>(() => {})
   const setSession = useCallback((change: (current: WorkspaceSession) => WorkspaceSession) => {
@@ -87,6 +97,7 @@ export function useWorkspaceTabs(hosts: Host[] | null, userID?: string) {
   const clear = useCallback(() => {
     stopSync.current()
     pending.current.clear()
+    pendingMoves.current = []
     try { sessionStorage.removeItem(sessionKey) } catch { /* Storage may be unavailable. */ }
     setSession(() => empty)
   }, [setSession, sessionKey])
@@ -116,8 +127,9 @@ export function useWorkspaceTabs(hosts: Host[] | null, userID?: string) {
         else projects.delete(key)
       }
       setSession(current => {
-        const next = [...projects.values()].map(project => current.projects.find(item => projectKey(item) === projectKey(project))
+        let next = [...projects.values()].map(project => current.projects.find(item => projectKey(item) === projectKey(project))
           ?? { ...project, directory: directories.get(project, directorySources.current ?? new Map()), activePath: null, expanded: true })
+        for (const move of pendingMoves.current) next = moveProject(next, move)
         const tabs = current.tabs.filter(tab => projects.has(projectKey(tab)))
         if (next.length === current.projects.length && next.every((project, index) => project === current.projects[index]) && tabs.length === current.tabs.length) return current
         return { projects: next, tabs }
@@ -126,20 +138,23 @@ export function useWorkspaceTabs(hosts: Host[] | null, userID?: string) {
       setReady(true)
     }
     async function sync() {
-      if (stopped || busy || (document.hidden && !pending.current.size)) return
+      if (stopped || busy || (document.hidden && !pending.current.size && !pendingMoves.current.length)) return
       clearTimeout(timer)
       busy = true
       const batch = new Map(pending.current)
-      writing = batch.size > 0
+      const moves = pendingMoves.current.slice(0, Math.max(0, 512 - batch.size))
+      writing = batch.size > 0 || moves.length > 0
       controller = new AbortController()
       let succeeded = false
       const acknowledge = () => {
         for (const [key, change] of batch) if (pending.current.get(key) === change) pending.current.delete(key)
+        pendingMoves.current = pendingMoves.current.filter(move => !moves.includes(move))
       }
       try {
         const body = {
           open: [...batch.values()].filter(change => change.open).map(change => change.project),
           close: [...batch.values()].filter(change => !change.open).map(change => change.project),
+          ...(moves.length ? { move: moves } : {}),
         }
         const snapshot = await api<SharedProjects>('/api/workspace/projects', writing
           ? { body, keepalive: JSON.stringify(body).length < 60_000, signal: controller.signal }
@@ -156,7 +171,7 @@ export function useWorkspaceTabs(hosts: Host[] | null, userID?: string) {
         setSyncError(errorMessage(failure))
       } finally {
         busy = false
-        if (!stopped) timer = window.setTimeout(() => void sync(), succeeded && pending.current.size ? 0 : 5000)
+        if (!stopped) timer = window.setTimeout(() => void sync(), succeeded && (pending.current.size || pendingMoves.current.length) ? 0 : 5000)
       }
     }
     const wake = () => { void sync() }
@@ -239,6 +254,14 @@ export function useWorkspaceTabs(hosts: Host[] | null, userID?: string) {
       return { ...current, tabs: current.tabs.map(item => projectKey(item) === projectKey(tab) ? ordered[index++] : item) }
     })
   }, [setSession])
+  const reorderProjects = useCallback((project: ProjectRef, target: ProjectRef, edge: ProjectMove['edge']) => {
+    const move = { project: { host: project.host, root: project.root }, target: { host: target.host, root: target.root }, edge }
+    const projects = moveProject(currentSession.current.projects, move)
+    if (projects === currentSession.current.projects) return
+    pendingMoves.current.push(move)
+    setSession(current => ({ ...current, projects }))
+    syncNow.current()
+  }, [setSession])
   const closeProject = useCallback((project: { host: string; root: string }) => {
     setSession(current => ({
       ...current,
@@ -255,5 +278,5 @@ export function useWorkspaceTabs(hosts: Host[] | null, userID?: string) {
   }, [setSession])
   const browseDirectory = (project: ProjectRef) => currentSession.current.projects.find(item => projectKey(item) === projectKey(project))?.directory
     ?? directories.get(project, directorySources.current ?? new Map()) ?? ''
-  return { ...session, ready, syncError, sourcesRevision, retrySync, remember, close, reorder, closeProject, toggleProject, setPaused, retain, clear, browseDirectory }
+  return { ...session, ready, syncError, sourcesRevision, retrySync, remember, close, reorder, reorderProjects, closeProject, toggleProject, setPaused, retain, clear, browseDirectory }
 }

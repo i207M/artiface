@@ -183,3 +183,89 @@ func TestSharedProjectsAuthorizationValidationAndSourceRemoval(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedProjectReorderingPersistsAndPreservesConcurrentChanges(t *testing.T) {
+	app, _, filename, _ := newSetupApp(t, "")
+	cfg, err := config.Update(filename, func(cfg *config.Config) error {
+		for _, id := range []string{"second", "third"} {
+			root := cfg.Hosts[0].Roots[0]
+			root.ID = id
+			cfg.Hosts[0].Roots = append(cfg.Hosts[0].Roots, root)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.adoptSources(cfg)
+	a := config.ProjectRef{Host: "test", Root: "artifacts"}
+	b := config.ProjectRef{Host: "test", Root: "second"}
+	c := config.ProjectRef{Host: "test", Root: "third"}
+	cookie, csrf := signIn(t, app)
+	other, otherCSRF := signIn(t, app)
+	write := func(body any, cookie *http.Cookie, csrf string) {
+		t.Helper()
+		if w := request(app, "POST", "/api/workspace/projects", body, cookie, csrf); w.Code != 200 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+	}
+	write(map[string]any{"open": []config.ProjectRef{a, b, c}}, cookie, csrf)
+	revision := readSharedProjects(t, app, cookie).SourcesRevision
+	write(map[string]any{"move": []projectMove{{Project: a, Target: c, Edge: "after"}}}, cookie, csrf)
+	if got := readSharedProjects(t, app, other); !slices.Equal(got.Projects, []config.ProjectRef{b, c, a}) || got.SourcesRevision != revision {
+		t.Fatal("order did not sync or invalidated readers", got)
+	}
+	saved, err := config.Load(filename)
+	if err != nil || !slices.Equal(saved.OpenProjects, []config.ProjectRef{b, c, a}) {
+		t.Fatal("order was not persisted", saved.OpenProjects, err)
+	}
+	write(map[string]any{"close": []config.ProjectRef{c}}, other, otherCSRF)
+	write(map[string]any{"move": []projectMove{{Project: a, Target: c, Edge: "before"}}}, cookie, csrf)
+	if got := readSharedProjects(t, app, cookie).Projects; !slices.Equal(got, []config.ProjectRef{b, a}) {
+		t.Fatal("stale move resurrected a closed project", got)
+	}
+	write(map[string]any{"open": []config.ProjectRef{c}, "move": []projectMove{{Project: a, Target: b, Edge: "before"}}}, cookie, csrf)
+	if got := readSharedProjects(t, app, cookie).Projects; !slices.Equal(got, []config.ProjectRef{a, b, c}) {
+		t.Fatal("moving overwrote a concurrent open", got)
+	}
+	before, _ := os.ReadFile(filename)
+	for _, move := range []projectMove{{Project: a, Target: b, Edge: "invalid"}, {Project: a, Target: config.ProjectRef{}, Edge: "after"}} {
+		if w := request(app, "POST", "/api/workspace/projects", map[string]any{"move": []projectMove{move}}, cookie, csrf); w.Code != 400 {
+			t.Fatal("invalid move accepted", w.Code)
+		}
+	}
+	after, _ := os.ReadFile(filename)
+	if !slices.Equal(before, after) {
+		t.Fatal("invalid move changed the config")
+	}
+}
+
+func TestSharedProjectReorderingIsAccountScoped(t *testing.T) {
+	app, filename := newTeamApp(t)
+	a := config.ProjectRef{Host: "test", Root: "artifacts"}
+	b := config.ProjectRef{Host: "test", Root: "second"}
+	cfg, err := config.Update(filename, func(cfg *config.Config) error {
+		root := cfg.Hosts[0].Roots[0]
+		root.ID = b.Root
+		cfg.Hosts[0].Roots = append(cfg.Hosts[0].Roots, root)
+		for index := range cfg.Users {
+			cfg.Users[index].Projects = []config.ProjectRef{a, b}
+			cfg.Users[index].OpenProjects = []config.ProjectRef{a, b}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app.adoptSources(cfg)
+	alice, csrf := teamSignIn(t, app, "alice", testPassword, false)
+	bob, _ := teamSignIn(t, app, "bob", testPassword, false)
+	body := map[string]any{"move": []projectMove{{Project: b, Target: a, Edge: "before"}}}
+	if w := request(app, "POST", "/api/workspace/projects", body, alice, csrf); w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	if !slices.Equal(readSharedProjects(t, app, alice).Projects, []config.ProjectRef{b, a}) ||
+		!slices.Equal(readSharedProjects(t, app, bob).Projects, []config.ProjectRef{a, b}) {
+		t.Fatal("project order leaked between accounts")
+	}
+}

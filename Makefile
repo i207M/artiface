@@ -38,6 +38,7 @@ browser-test:
 	node scripts/markdown-outline.mjs
 	node scripts/popover-regression.mjs
 	node scripts/sidebar-resize-regression.mjs
+	node scripts/project-reorder-regression.mjs
 	node scripts/browse-paging-regression.mjs
 	node scripts/folder-picker-regression.mjs
 	node scripts/project-setup-regression.mjs

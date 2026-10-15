@@ -4,7 +4,7 @@ Browse and read artifacts from local and SSH machines in one browser workspace.
 
 ## For users
 
-- **Projects and tabs:** Open files across projects, drag tabs to reorder them on desktop, and find open files in Overview.
+- **Projects and tabs:** Drag opened projects and file tabs to reorder them on desktop, sync project order across devices, and find open files in Overview.
   Project lists sync across your devices; file tabs stay separate on each device.
 - **Flexible browsing:** Use list or icon view, sort by name, type, size, or modification time, and filter by filename or file type.
   Browse paths and preferences are remembered, with an option to include files from subfolders.

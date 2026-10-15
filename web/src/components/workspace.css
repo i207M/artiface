@@ -33,7 +33,12 @@ html[data-theme="dark"] .projects-sidebar { --nav-selected: #2c3e33; --nav-selec
 .project-list-label { display: flex; align-items: center; justify-content: space-between; margin: 0 var(--sidebar-gutter); padding: 5px 4px; color: var(--muted); font-size: var(--small); font-weight: 600; }
 .project-list { flex: 1; min-height: 0; overflow: auto; padding: 0 var(--sidebar-gutter) 12px; }
 .project-list-empty { padding: 16px 10px; color: var(--muted); font-size: var(--small); }
-.project-group { margin-bottom: 4px; }
+.project-group { position: relative; margin-bottom: 4px; }
+.project-group.is-project-dragging { opacity: .5; }
+.project-group.is-project-drop-before::before, .project-group.is-project-drop-after::after { content: ''; position: absolute; left: 4px; right: 4px; height: 2px; background: var(--accent); pointer-events: none; z-index: 2; }
+.project-group.is-project-drop-before::before { top: -2px; }
+.project-group.is-project-drop-after::after { bottom: 0; }
+.project-open[draggable="true"] { cursor: grab; user-select: none; }
 /* Expanded lists supply equal spacing above and below their file rows. */
 .project-group:has(> .project-children) { margin-bottom: 0; }
 .project-line { --project-background: var(--sidebar); --hover: color-mix(in srgb, var(--project-background) 90%, black); display: flex; align-items: center; min-width: 0; padding-inline: 4px; gap: 4px; border-radius: 6px; background: var(--project-background); transition: background-color 120ms ease; }

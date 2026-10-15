@@ -27,6 +27,7 @@ import ProjectChooser from './ProjectChooser'
 import OverviewColumns from './OverviewColumns'
 import SettingsPage from './SettingsPage'
 import SidebarResize from './SidebarResize'
+import { useReorderDrag } from './useReorderDrag'
 import Tabs from './Tabs'
 import { allReaderTypes, readerType, sortEntries } from './fileTypes'
 import type { SortColumn } from './fileTypes'
@@ -70,7 +71,7 @@ export default function Workspace({ location, navigate, onLogout, canManage = tr
   const readerFocus = useBrowseReaderFocus(location)
   const [preferences, setPreferences] = usePreferences()
   const [hosts, setHosts] = useState<Host[] | null>(null)
-  const { projects, tabs, ready: projectsReady, syncError, sourcesRevision, retrySync, remember, close, reorder, closeProject, toggleProject, setPaused, retain, clear, browseDirectory } = useWorkspaceTabs(hosts, userID)
+  const { projects, tabs, ready: projectsReady, syncError, sourcesRevision, retrySync, remember, close, reorder, reorderProjects, closeProject, toggleProject, setPaused, retain, clear, browseDirectory } = useWorkspaceTabs(hosts, userID)
   const [hostsError, setHostsError] = useState('')
   const [hostsAttempt, setHostsAttempt] = useState(0)
   const [catalogRevision, setCatalogRevision] = useState('')
@@ -121,6 +122,7 @@ export default function Workspace({ location, navigate, onLogout, canManage = tr
   const [toast, setToast] = useState('')
   const [loggingOut, setLoggingOut] = useState(false)
   const sidebar = useRef<HTMLElement>(null)
+  const projectList = useRef<HTMLElement>(null)
   const sidebarToggle = useRef<HTMLButtonElement>(null)
   const returnSidebarFocus = useRef(true)
   const settingsReturn = useRef<Location>(home)
@@ -192,6 +194,10 @@ export default function Workspace({ location, navigate, onLogout, canManage = tr
     const project = host?.roots.find(project => project.id === state.root)
     return host && project ? [{ state, host, project, tabs: tabs.filter(tab => projectKey(tab) === projectKey(state)) }] : []
   }), [projects, tabs, visibleHosts])
+  const projectDrag = useReorderDrag(projectList, openProjects.map(item => item.state), `${sidebarShown}:${overlay}:${locationHash(location)}`, reorderProjects, {
+    key: projectKey, attribute: 'data-project-key', image: '.project-line',
+    transferType: 'application/x-artiface-project', axis: 'vertical',
+  })
   const overviewMachines = useMemo(() => {
     const projectsByLabel = new Map<string, Set<string>>()
     const hostsByLabel = new Map<string, Set<string>>()
@@ -464,6 +470,21 @@ export default function Workspace({ location, navigate, onLogout, canManage = tr
     if (keyboard) returnSidebarFocus.current = true
   }
   function moveSidebarFocus(event: ReactKeyboardEvent<HTMLElement>) {
+    if (!event.defaultPrevented && !event.nativeEvent.isComposing && event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey &&
+      ['ArrowUp', 'ArrowDown'].includes(event.key) && event.target instanceof HTMLButtonElement && event.target.matches('.project-open')) {
+      event.preventDefault()
+      const origin = event.target
+      const key = origin.closest<HTMLElement>('[data-project-key]')?.dataset.projectKey
+      const index = openProjects.findIndex(item => projectKey(item.state) === key)
+      const target = openProjects[index + (event.key === 'ArrowUp' ? -1 : 1)]
+      if (index >= 0 && target) {
+        reorderProjects(openProjects[index].state, target.state, event.key === 'ArrowUp' ? 'before' : 'after')
+        requestAnimationFrame(() => {
+          if (origin.isConnected && document.hasFocus() && (document.activeElement === document.body || document.activeElement === origin)) origin.focus({ preventScroll: true })
+        })
+      }
+      return
+    }
     if (event.defaultPrevented || event.nativeEvent.isComposing ||
       event.altKey || event.ctrlKey || event.metaKey || event.shiftKey ||
       !['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
@@ -643,10 +664,10 @@ export default function Workspace({ location, navigate, onLogout, canManage = tr
       </div></div>
       <button className={`overview-nav ${location.kind === 'overview' ? 'active' : ''}`} aria-current={location.kind === 'overview' ? 'page' : undefined} onClick={goHome}><Layers size={18} />Overview<span>{tabs.length}</span></button>
       <div className="project-list-label"><span>Projects</span><button className="icon-button" aria-label="Add project" title="Open or add a project" onClick={addProject}><Plus size={17} /></button></div>
-      <nav className="project-list" aria-label="Open projects" aria-describedby="project-list-keyboard-help" onKeyDown={moveSidebarFocus}>
-        <span id="project-list-keyboard-help" className="sr-only">Use Up/Down or Home/End to move between project and file names, Enter to open, and Tab to reach row controls.</span>
+      <nav ref={projectList} className="project-list" aria-label="Open projects" aria-describedby="project-list-keyboard-help" onKeyDown={moveSidebarFocus} {...projectDrag.listEvents}>
+        <span id="project-list-keyboard-help" className="sr-only">Use Up/Down or Home/End to move between project and file names, Enter to open, and Tab to reach row controls. Drag project names or use Alt+Up/Down to reorder projects.</span>
         {!openProjects.length && <p className="project-list-empty">{projectsReady ? 'Open a project to start browsing.' : 'Loading shared projects…'}</p>}
-        {openProjects.map(({ state, host, project, tabs: projectFiles }) => <div className={`project-group ${isProjectLocation(location) && projectKey(state) === projectKey(location) ? 'current-project' : ''}`} key={projectKey(state)} role="group" aria-labelledby={`sidebar-project-label-${encodeURIComponent(projectKey(state))}`}>
+        {openProjects.map(({ state, host, project, tabs: projectFiles }) => <div className={`project-group ${isProjectLocation(location) && projectKey(state) === projectKey(location) ? 'current-project' : ''}${projectDrag.feedback?.source === projectKey(state) ? ' is-project-dragging' : ''}${projectDrag.feedback?.target?.key === projectKey(state) ? ` is-project-drop-${projectDrag.feedback.target.edge}` : ''}`} key={projectKey(state)} data-project-key={projectKey(state)} role="group" aria-labelledby={`sidebar-project-label-${encodeURIComponent(projectKey(state))}`}>
           <div className="project-line">
             <button className="icon-button project-disclosure" aria-label={projectFiles.length ? `${state.expanded ? 'Collapse' : 'Expand'} project ${project.label}` : `${project.label} has no open files`}
               title={projectFiles.length ? `${state.expanded ? 'Hide' : 'Show'} open files in ${project.label}` : `No open files in ${project.label}`}
@@ -654,8 +675,9 @@ export default function Workspace({ location, navigate, onLogout, canManage = tr
               <ProjectFolderIcon expanded={state.expanded && projectFiles.length > 0} />
             </button>
             <button className="project-open" aria-label={`Open project ${project.label} on ${host.label}`}
+              draggable={projectDrag.enabled} onPointerDown={projectDrag.pointerDown} onMouseDown={projectDrag.mouseDown} onDragStart={event => projectDrag.start(event, state)}
               aria-current={location.kind === 'directory' && projectKey(state) === projectKey(location) ? 'page' : undefined}
-              onClick={() => activateProject(state)} title={`${project.label}\n${host.label}\n${project.path}`}>
+              onClick={() => activateProject(state)} title={`${project.label}\n${host.label}\n${project.path}${projectDrag.enabled ? '\nDrag to reorder projects' : ''}`}>
               <span id={`sidebar-project-label-${encodeURIComponent(projectKey(state))}`}><strong>{project.label}</strong><small>{host.label}</small></span>
             </button>
             <button className="icon-button project-close" aria-label={`Close project ${project.label}`} title="Close project and its tabs" onClick={event => closeSidebarProject(event, state)}><X size={14} /></button>

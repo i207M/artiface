@@ -15,6 +15,12 @@ type sharedProjectsResponse struct {
 	SourcesRevision string              `json:"sourcesRevision"`
 }
 
+type projectMove struct {
+	Project config.ProjectRef `json:"project"`
+	Target  config.ProjectRef `json:"target"`
+	Edge    string            `json:"edge"`
+}
+
 func sharedProjects(cfg config.Config) sharedProjectsResponse {
 	cfg.PruneOpenProjects()
 	return sharedProjectsResponse{Projects: cfg.OpenProjects, SourcesRevision: configRevision(cfg)}
@@ -56,17 +62,24 @@ func (a *App) updateSharedProjects(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Open  []config.ProjectRef `json:"open"`
 		Close []config.ProjectRef `json:"close"`
+		Move  []projectMove       `json:"move"`
 	}
 	if !decodeLimit(w, r, &body, 128<<10) {
 		return
 	}
-	if len(body.Open)+len(body.Close) > config.MaxOpenProjects {
+	if len(body.Open)+len(body.Close)+len(body.Move) > config.MaxOpenProjects {
 		fail(w, http.StatusBadRequest, "Too many project changes")
 		return
 	}
 	for _, project := range append(slices.Clone(body.Open), body.Close...) {
 		if !project.Valid() {
 			fail(w, http.StatusBadRequest, "A valid host and root are required")
+			return
+		}
+	}
+	for _, move := range body.Move {
+		if !move.Project.Valid() || !move.Target.Valid() || (move.Edge != "before" && move.Edge != "after") {
+			fail(w, http.StatusBadRequest, "A valid project, target, and before/after edge are required")
 			return
 		}
 	}
@@ -96,6 +109,19 @@ func (a *App) updateSharedProjects(w http.ResponseWriter, r *http.Request) {
 			if !slices.Contains(view.OpenProjects, project) {
 				view.OpenProjects = append(view.OpenProjects, project)
 			}
+		}
+		for _, move := range body.Move {
+			source, target := slices.Index(view.OpenProjects, move.Project), slices.Index(view.OpenProjects, move.Target)
+			// A stale move must not reopen a project closed on another device.
+			if source < 0 || target < 0 || source == target {
+				continue
+			}
+			view.OpenProjects = slices.Delete(view.OpenProjects, source, source+1)
+			target = slices.Index(view.OpenProjects, move.Target)
+			if move.Edge == "after" {
+				target++
+			}
+			view.OpenProjects = slices.Insert(view.OpenProjects, target, move.Project)
 		}
 		if s.userID != "" {
 			cfg.Users = slices.Clone(cfg.Users)

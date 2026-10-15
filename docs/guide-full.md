@@ -20,6 +20,8 @@ Files and the original SSH configuration remain on their machines.
 Click a sidebar project name for Browse, its folder icon to expand its tabs, or the logo for Overview.
 Overview gathers open files across projects and shows modification times.
 Browse is always the first main tab; opening a file creates another tab, and desktop tabs can be dragged to reorder.
+Drag project names in the left sidebar to reorder opened projects.
+The project order is saved and synced across your devices; you can also focus a project name and use **Alt+Up/Down**.
 Control/Command-click or middle-click opens a file from Browse in a background tab.
 **Open containing folder** in Reader options returns to nearby files without closing the reader.
 
