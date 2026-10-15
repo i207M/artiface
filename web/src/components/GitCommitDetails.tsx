@@ -59,7 +59,6 @@ export default function GitCommitDetails({ commit, location, active, onDiff }: {
   }, [active, url, attempt, data])
   const tree = useMemo(() => gitFileTree(data?.files ?? []), [data])
   return <div className="git-commit-content">
-    <pre className="git-commit-message">{commit.message || '(No commit message)'}</pre>
     {error ? <p className="git-message" role="status">{error} <button className="text-button" onClick={() => setAttempt(value => value + 1)}>Try again</button></p>
       : !data ? <Loading message="Loading changed files…" compact />
         : <>
@@ -70,6 +69,7 @@ export default function GitCommitDetails({ commit, location, active, onDiff }: {
           {data.truncated && <p className="git-message" role="status">Showing a partial file list.</p>}
           <details className="git-commit-metadata">
             <summary>Commit details</summary>
+            <pre className="git-commit-message">{commit.message || '(No commit message)'}</pre>
             <dl>
               <dt>Commit</dt><dd><code>{data.hash}</code></dd>
               <dt>Parents</dt><dd>{data.parents.length ? data.parents.map(parent => <code key={parent}>{parent}</code>) : 'None (initial commit)'}</dd>

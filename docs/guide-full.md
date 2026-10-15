@@ -170,13 +170,13 @@ Deleted files show a deletion message in Inline mode; switch to Side by side to 
 
 Open the Git menu in Browse and choose **View Git history** for a separate commit graph tab.
 The graph includes local branches, remote-tracking branches, tags, and HEAD without fetching from remotes.
-Click a commit to expand its full message and changed files directly beneath the row.
+Click a commit to expand its changed files directly beneath the row.
 Changed files appear in a collapsible folder tree, with added, modified, deleted, and type-change badges.
 Click a file in this tree to open its historical diff in a separate tab with **Inline** and **Side by side** layouts.
 Historical diffs compare the selected commit with its first parent, or an empty baseline for the initial commit, and work for deleted files.
 Tabs for different commits remain separate from each other and from working-tree diffs.
 Merge commits show changes relative to their first parent.
-Open **Commit details**, collapsed by default, for the full hash, parents, author, committer, and dates.
+Open **Commit details**, collapsed by default, for the full message, hash, parents, author, committer, and dates.
 Select text in the history rows or expanded content and copy it normally.
 Click the commit row again, use its chevron, or press Enter or Space to collapse it.
 Use **Load older commits** to extend the graph, or **Refresh history** to see newer commits.
