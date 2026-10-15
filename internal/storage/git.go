@@ -128,6 +128,28 @@ case "$2" in
     g diff-tree -r --no-commit-id --name-status -z --no-renames --no-ext-diff --no-textconv \
       --ignore-submodules=none --relative "$@" -- . 2>/dev/null
     ;;
+  commit-diff)
+    [ "$(g cat-file -t "$4" 2>/dev/null)" = commit ] || exit 26
+    if [ -n "$prefix" ]; then
+      scoped=$(g log -1 --full-history --simplify-merges --parents --no-notes --no-show-signature --format=%H "$4" -- . 2>/dev/null) || exit 24
+      [ "$scoped" = "$4" ] || exit 26
+    fi
+    parent=$(g rev-parse --verify "$4^1" 2>/dev/null) || parent=
+    for revision in "$parent" "$4"; do
+      [ -n "$revision" ] || continue
+      kind=$(g cat-file -t "$revision:$prefix$3" 2>/dev/null) || kind=missing
+      [ "$kind" != tree ] || exit 24
+      if [ "$kind" = blob ]; then
+        size=$(g cat-file -s "$revision:$prefix$3") || exit 24
+        [ "$size" -le 8388608 ] || exit 25
+      fi
+    done
+    if [ -n "$parent" ]; then
+      g diff --no-ext-diff --no-textconv --no-renames --ignore-submodules=none --submodule=short --relative --no-color "$parent" "$4" -- "$3" 2>/dev/null
+    else
+      g diff-tree --root -p --no-commit-id --no-ext-diff --no-textconv --no-renames --ignore-submodules=none --submodule=short --relative --no-color "$4" -- "$3" 2>/dev/null
+    fi
+    ;;
   *) exit 24 ;;
 esac
 `
@@ -165,7 +187,7 @@ func runGit(parent context.Context, target, root, operation, rel string, limit i
 	return (GitReader{}).run(parent, target, root, operation, rel, limit)
 }
 
-func (g GitReader) run(parent context.Context, target, root, operation, rel string, limit int) ([]byte, error) {
+func (g GitReader) run(parent context.Context, target, root, operation, rel string, limit int, extra ...string) ([]byte, error) {
 	var err error
 	if target == "" {
 		root, rel, err = validateLocalRequest(target, root, rel)
@@ -181,6 +203,7 @@ func (g GitReader) run(parent context.Context, target, root, operation, rel stri
 	ctx, cancel := context.WithTimeout(parent, GitTimeout)
 	defer cancel()
 	args := []string{"-c", gitScript, "artiface-git", root, operation, rel}
+	args = append(args, extra...)
 	cmd := exec.CommandContext(ctx, "sh", args...)
 	remoteCommand := ""
 	if target != "" {

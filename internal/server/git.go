@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"io/fs"
 	"net/http"
@@ -31,24 +32,25 @@ type gitCall struct {
 	err  error
 }
 type gitService struct {
-	mu          sync.Mutex
-	cache       map[gitSource]gitStatusResponse
-	pending     map[gitSource]*gitCall
-	slots       chan struct{}
-	ctx         context.Context
-	cancel      context.CancelFunc
-	now         func() time.Time
-	read        func(context.Context, string, string) (storage.GitStatus, error)
-	readDiff    func(context.Context, string, string, string) (string, bool, error)
-	readHistory func(context.Context, string, string, int) (storage.GitHistory, error)
-	readCommit  func(context.Context, string, string, string) (storage.GitCommitDetails, error)
+	mu             sync.Mutex
+	cache          map[gitSource]gitStatusResponse
+	pending        map[gitSource]*gitCall
+	slots          chan struct{}
+	ctx            context.Context
+	cancel         context.CancelFunc
+	now            func() time.Time
+	read           func(context.Context, string, string) (storage.GitStatus, error)
+	readDiff       func(context.Context, string, string, string) (string, bool, error)
+	readHistory    func(context.Context, string, string, int) (storage.GitHistory, error)
+	readCommit     func(context.Context, string, string, string) (storage.GitCommitDetails, error)
+	readCommitDiff func(context.Context, string, string, string, string) (string, bool, error)
 }
 
 func newGitService() *gitService {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &gitService{cache: make(map[gitSource]gitStatusResponse), pending: make(map[gitSource]*gitCall),
 		slots: make(chan struct{}, 2), ctx: ctx, cancel: cancel, now: time.Now,
-		read: storage.ReadGitStatus, readDiff: storage.ReadGitDiff, readHistory: storage.ReadGitHistory, readCommit: storage.ReadGitCommit}
+		read: storage.ReadGitStatus, readDiff: storage.ReadGitDiff, readHistory: storage.ReadGitHistory, readCommit: storage.ReadGitCommit, readCommitDiff: storage.ReadGitCommitDiff}
 }
 
 func (g *gitService) status(parent context.Context, source gitSource, force bool) (gitStatusResponse, error) {
@@ -226,6 +228,14 @@ func (a *App) gitDiff(w http.ResponseWriter, r *http.Request) {
 		fail(w, http.StatusBadRequest, "Choose a file to compare")
 		return
 	}
+	commit := r.URL.Query().Get("commit")
+	if commit != "" {
+		decoded, err := hex.DecodeString(commit)
+		if err != nil || (len(decoded) != 20 && len(decoded) != 32) {
+			fail(w, http.StatusBadRequest, "Choose a valid commit ID")
+			return
+		}
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), storage.GitTimeout)
 	stop := context.AfterFunc(a.git.ctx, cancel)
 	defer func() { stop(); cancel() }()
@@ -237,19 +247,32 @@ func (a *App) gitDiff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	source := gitSource{host.Target, root.Path}
-	if err := a.verifyGitPath(ctx, source, rel); err != nil {
-		if errors.Is(err, storage.ErrGitFileSize) {
-			fail(w, http.StatusRequestEntityTooLarge, gitDiffSizeMessage)
-		} else {
-			storageError(w, err)
+	if commit == "" {
+		if err := a.verifyGitPath(ctx, source, rel); err != nil {
+			if errors.Is(err, storage.ErrGitFileSize) {
+				fail(w, http.StatusRequestEntityTooLarge, gitDiffSizeMessage)
+			} else {
+				storageError(w, err)
+			}
+			return
 		}
-		return
 	}
-	patch, truncated, err := a.git.readDiff(ctx, host.Target, root.Path, rel)
+	var patch string
+	var truncated bool
+	var err error
+	if commit == "" {
+		patch, truncated, err = a.git.readDiff(ctx, host.Target, root.Path, rel)
+	} else {
+		patch, truncated, err = a.git.readCommitDiff(ctx, host.Target, root.Path, rel, commit)
+	}
 	if !a.sameGitSource(w, r, loc, source) {
 		return
 	}
 	if err != nil {
+		if errors.Is(err, storage.ErrGitCommit) {
+			fail(w, http.StatusNotFound, "This commit is no longer available in this project.")
+			return
+		}
 		var hostKey *sshvault.HostKeyError
 		if errors.As(err, &hostKey) || errors.Is(err, sshvault.ErrHostKeyExpired) {
 			storageError(w, err)

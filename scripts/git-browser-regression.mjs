@@ -98,6 +98,7 @@ try {
   let checks = 0, diffs = 0, metadataReads = 0
   let historyReads = 0, historyChanged = false, holdHistory = false, heldHistory
   let commitReads = 0, holdCommit = false, heldCommit
+  let historicalDiffReads = 0
   let patch = 'diff --git a/notes.py b/notes.py\n@@ -1 +1 @@\n-before\n+<script>window.diffExecuted=true</script>\n'
   await context.route('**/*', route => {
     const url = new URL(route.request().url())
@@ -123,6 +124,10 @@ try {
       body = statuses[root]
     }
     if (url.pathname === '/api/git/diff') {
+      if (url.searchParams.get('commit')) {
+        historicalDiffReads++
+        return route.fulfill({ json: { patch: `@@ -1 +1 @@\n-before\n+Committed ${url.searchParams.get('commit').slice(0, 8)}\n`, truncated: false } })
+      }
       diffs++
       if (oversizedDiff) return route.fulfill({ status: 413, json: { error: 'Diff previews support file versions up to 8 MiB.' } })
       if (holdDiff) { heldDiff = route; holdDiff = false; return }
@@ -321,6 +326,37 @@ try {
   await expect(expansion).toContainText('Start feature')
   await history.locator('.git-history-row').nth(3).locator('.git-history-disclosure').click()
   await expect(expansion).toHaveCount(0)
+  await firstRow.click()
+  await expansion.getByRole('button', { name: 'View commit diff for reports/old.txt', exact: true }).click()
+  const historicalTab = strip.getByRole('tab', { name: 'old.txt · 66666666 · Diff', exact: true })
+  await expect(historicalTab).toHaveAttribute('aria-selected', 'true')
+  await expect(viewer.getByLabel('File diff')).toContainText('Committed 66666666')
+  await expect(viewer.getByLabel('Git diff', { exact: true })).toBeFocused()
+  await viewer.getByRole('button', { name: 'Share link', exact: true }).click()
+  assert.match(await page.evaluate(() => window.copiedText), new RegExp(`commit=${hash(6)}`))
+  await viewer.getByRole('button', { name: 'Inline diff', exact: true }).click()
+  await expect(viewer.getByLabel('File diff')).toContainText('Commit 66666666')
+  await viewer.getByRole('button', { name: 'Side-by-side diff', exact: true }).click()
+  await expect(viewer.getByLabel('File diff')).toContainText('After · 66666666')
+  assert.equal(historicalDiffReads, 1, 'Layout selection refetched the historical diff')
+  await historyTab.click()
+  await history.locator('.git-history-row').nth(2).click()
+  await expansion.getByRole('button', { name: 'View commit diff for reports/old.txt', exact: true }).click()
+  const secondHistoricalTab = strip.getByRole('tab', { name: 'old.txt · 44444444 · Diff', exact: true })
+  await expect(secondHistoricalTab).toHaveAttribute('aria-selected', 'true')
+  await expect(viewer.getByLabel('File diff')).toContainText('Committed 44444444')
+  await expect(historicalTab).toHaveCount(1)
+  await page.reload()
+  await expect(secondHistoricalTab).toHaveAttribute('aria-selected', 'true')
+  await expect(historicalTab).toHaveCount(1)
+  await expect(viewer.getByLabel('File diff')).toContainText('Committed 44444444')
+  await historicalTab.click()
+  await expect(viewer.getByLabel('File diff')).toContainText('Committed 66666666')
+  await historyTab.click()
+  await strip.getByRole('button', { name: 'Close old.txt · 66666666 · Diff', exact: true }).click()
+  await strip.getByRole('button', { name: 'Close old.txt · 44444444 · Diff', exact: true }).click()
+  await expect(history.locator('.git-history-row')).toHaveCount(4)
+  console.log('PASS: history files open commit-specific diffs, including deleted files, separate versions, layout selection, share links and reload restoration')
   await history.getByRole('button', { name: 'Load older commits', exact: true }).click()
   await expect(history.locator('.git-history-row')).toHaveCount(6)
   await expect(history.getByRole('button', { name: 'Load older commits', exact: true })).toHaveCount(0)

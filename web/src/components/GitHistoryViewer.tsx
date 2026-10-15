@@ -34,13 +34,14 @@ function GraphContinuation({ row, width }: { row: GraphRow; width: number }) {
   </span>
 }
 
-export default function GitHistoryViewer({ location, active, focusRequest, copied, onCopyLink, onExpand }: {
+export default function GitHistoryViewer({ location, active, focusRequest, copied, onCopyLink, onExpand, onDiff }: {
   location: FileLocation
   active: boolean
   focusRequest?: BrowseReaderFocusRequest | null
   copied: boolean
   onCopyLink: () => void
   onExpand: () => void
+  onDiff: (path: string, commit: string) => void
 }) {
   const content = useRef<HTMLDivElement>(null)
   const loaded = useRef('')
@@ -144,7 +145,7 @@ export default function GitHistoryViewer({ location, active, focusRequest, copie
                   </div>
                   {selected === item.hash && <section className="git-commit-expanded" id={expansionID} aria-label="Commit changes">
                     <GraphContinuation row={graph.rows[index]} width={graphWidth} />
-                    <GitCommitDetails commit={item} location={location} active={active} />
+                    <GitCommitDetails commit={item} location={location} active={active} onDiff={path => onDiff(path, item.hash)} />
                   </section>}
                 </li>)}
               </ol>

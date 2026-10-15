@@ -14,26 +14,33 @@ export function selectedTextWithin(element: HTMLElement) {
 }
 
 const statuses = { A: 'Added', D: 'Deleted', M: 'Modified', T: 'Type changed' }
-function FileTree({ nodes, nested = false }: { nodes: GitFileNode[]; nested?: boolean }) {
+function FileTree({ nodes, onDiff, nested = false }: { nodes: GitFileNode[]; onDiff: (path: string) => void; nested?: boolean }) {
   return <ul className="git-commit-file-tree" aria-label={nested ? undefined : 'Changed files'}>
     {nodes.map(node => <li key={`${node.status ? 'file' : 'directory'}:${node.path}`}>
-      {node.status ? <div className="git-commit-file" title={`${statuses[node.status]} · ${node.path}`}>
+      {node.status ? <div className="git-commit-file" title={`View commit diff · ${statuses[node.status]} · ${node.path}`}
+        role="button" tabIndex={0} aria-label={`View commit diff for ${node.path}`}
+        onClick={event => { if (event.detail <= 1 && !selectedTextWithin(event.currentTarget)) onDiff(node.path) }}
+        onKeyDown={event => {
+          if (event.defaultPrevented || event.nativeEvent.isComposing || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return
+          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (!event.repeat) onDiff(node.path) }
+        }}>
         <EntryIcon entry={{ type: 'file', path: node.path }} /><span className="git-commit-file-name">{node.name}</span>
         <span className={`git-badge git-${node.status}`} aria-label={statuses[node.status]}>{node.status}</span>
       </div> : <details className="git-commit-folder" open>
         <summary onClick={event => { if (event.detail && (event.detail > 1 || selectedTextWithin(event.currentTarget))) event.preventDefault() }}>
           <ChevronRight className="git-tree-disclosure" size={14} /><Folder size={16} /><span>{node.name}</span>
         </summary>
-        <FileTree nodes={node.children} nested />
+        <FileTree nodes={node.children} onDiff={onDiff} nested />
       </details>}
     </li>)}
   </ul>
 }
 
-export default function GitCommitDetails({ commit, location, active }: {
+export default function GitCommitDetails({ commit, location, active, onDiff }: {
   commit: GitCommit
   location: FileLocation
   active: boolean
+  onDiff: (path: string) => void
 }) {
   const [data, setData] = useState<CommitDetails | null>(null)
   const [error, setError] = useState('')
@@ -59,7 +66,7 @@ export default function GitCommitDetails({ commit, location, active }: {
           <header className="git-commit-files-heading"><strong>Files changed <span>({data.files.length}{data.truncated ? '+' : ''})</span></strong>
             {data.parents.length > 1 && <span>Compared with first parent</span>}
           </header>
-          {tree.length ? <FileTree nodes={tree} /> : <p className="git-message">No file changes in this project.</p>}
+          {tree.length ? <FileTree nodes={tree} onDiff={onDiff} /> : <p className="git-message">No file changes in this project.</p>}
           {data.truncated && <p className="git-message" role="status">Showing a partial file list.</p>}
           <details className="git-commit-metadata">
             <summary>Commit details</summary>

@@ -15,14 +15,14 @@ function SplitCell({ line, side }: { line?: DiffLine; side: 'old' | 'new' }) {
   </div>
 }
 
-export default function GitDiffContent({ patch, layout }: { patch: string; layout: 'inline' | 'split' }) {
+export default function GitDiffContent({ patch, layout, commit }: { patch: string; layout: 'inline' | 'split'; commit?: string }) {
   const diff = useMemo(() => parseGitDiff(patch), [patch])
   const split = useMemo(() => diff.hunks.map(hunk => splitDiffLines(hunk.lines)), [diff])
   if (!patch) return <p className="git-message">No textual changes to display.</p>
   return <div className={`git-diff-table git-diff-${layout}`} aria-label="File diff" data-layout={layout}>
     {diff.metadata.length > 0 && <pre className="git-diff-metadata">{diff.metadata.join('\n')}</pre>}
     {diff.hunks.length > 0 && <div className={`git-diff-labels ${layout === 'split' ? 'git-split-row' : ''}`}>
-      {layout === 'split' ? <><span>Before</span><span>After · Working tree</span></> : <span>Before / After · Line numbers</span>}
+      {layout === 'split' ? <><span>Before</span><span>{commit ? `After · ${commit.slice(0, 8)}` : 'After · Working tree'}</span></> : <span>{commit ? `Commit ${commit.slice(0, 8)} · Before / After` : 'Before / After · Line numbers'}</span>}
     </div>}
     {diff.hunks.map((hunk, index) => <section key={index} aria-label={`Changes ${hunk.header}`}>
       <div className="git-diff-hunk">{hunk.header}</div>

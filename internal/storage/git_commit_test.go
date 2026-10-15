@@ -72,6 +72,22 @@ func TestGitCommitFilesMetadataScopeAndMerge(t *testing.T) {
 		!strings.Contains(details.Message, "<script>text</script>") || !slices.Equal(details.Parents, []string{initial}) {
 		t.Fatalf("commit metadata was lost: %+v", details)
 	}
+	// The diff belongs to the selected commit, even after the working file changes.
+	write("reports/src/first.txt", "uncommitted content")
+	for _, file := range []string{"src/first.txt", "old.txt", "plots/a + ü.csv"} {
+		patch, truncated, err := ReadGitCommitDiff(context.Background(), "", scopedRoot, file, updated)
+		if err != nil || truncated || !strings.Contains(patch, file) || strings.Contains(patch, "uncommitted content") || strings.Contains(patch, "outside") {
+			t.Fatalf("historical diff %s: %q, %v, %v", file, patch, truncated, err)
+		}
+	}
+	patch, _, err := ReadGitCommitDiff(context.Background(), "", scopedRoot, "src/first.txt", initial)
+	if err != nil || !strings.Contains(patch, "+before") || !strings.Contains(patch, "/dev/null") {
+		t.Fatalf("root commit diff: %q %v", patch, err)
+	}
+	if _, _, err := ReadGitCommitDiff(context.Background(), "", scopedRoot, "../private.txt", updated); !errors.Is(err, ErrForbidden) {
+		t.Fatal("historical diff escaped project scope", err)
+	}
+	write("reports/src/first.txt", "after")
 	after, err := os.ReadFile(filepath.Join(root, ".git/index"))
 	if err != nil || !slices.Equal(index, after) {
 		t.Fatal("commit read modified the index")
@@ -81,6 +97,9 @@ func TestGitCommitFilesMetadataScopeAndMerge(t *testing.T) {
 	git("commit", "-m", "Private outside commit")
 	if _, err := ReadGitCommit(context.Background(), "", scopedRoot, head()); !errors.Is(err, ErrGitCommit) {
 		t.Fatal("commit outside the scoped history exposed metadata", err)
+	}
+	if _, _, err := ReadGitCommitDiff(context.Background(), "", scopedRoot, "src/first.txt", head()); !errors.Is(err, ErrGitCommit) {
+		t.Fatal("diff accepted a commit outside the project history", err)
 	}
 	git("checkout", "-b", "feature")
 	write("reports/branch.txt", "branch")
@@ -95,6 +114,10 @@ func TestGitCommitFilesMetadataScopeAndMerge(t *testing.T) {
 	if err != nil || len(merge.Parents) != 2 || !slices.Equal(merge.Files, []GitCommitFile{{Path: "branch.txt", Status: "A"}}) {
 		t.Fatalf("merge should compare against its first parent: %+v %v", merge, err)
 	}
+	patch, _, err = ReadGitCommitDiff(context.Background(), "", scopedRoot, "branch.txt", head())
+	if err != nil || !strings.Contains(patch, "+branch") {
+		t.Fatalf("merge diff did not compare first parent: %q %v", patch, err)
+	}
 	remote := GitReader{Remote: func(ctx context.Context, _, command string, output io.Writer) error {
 		cmd := exec.CommandContext(ctx, "sh", "-c", command)
 		cmd.Stdout = output
@@ -103,6 +126,10 @@ func TestGitCommitFilesMetadataScopeAndMerge(t *testing.T) {
 	remoteDetails, err := remote.Commit(context.Background(), "fixture-host", scopedRoot, updated)
 	if err != nil || !slices.Equal(remoteDetails.Files, want) {
 		t.Fatalf("remote commit read: %+v %v", remoteDetails, err)
+	}
+	patch, _, err = remote.CommitDiff(context.Background(), "fixture-host", scopedRoot, "old.txt", updated)
+	if err != nil || !strings.Contains(patch, "-old") {
+		t.Fatalf("remote historical diff: %q %v", patch, err)
 	}
 }
 
@@ -128,5 +155,36 @@ func TestGitCommitRejectsReferencesAndBoundsFiles(t *testing.T) {
 	result, err := reader.Commit(context.Background(), "fixture-host", "/project", hash)
 	if err != nil || len(result.Files) != MaxGitChanges || !result.Truncated {
 		t.Fatalf("unbounded file list: %d %v %v", len(result.Files), result.Truncated, err)
+	}
+}
+
+func TestGitCommitDiffBoundsHistoricalVersionsAndPatch(t *testing.T) {
+	root, git := gitFixture(t)
+	file := filepath.Join(root, "large.txt")
+	if err := os.WriteFile(file, []byte(strings.Repeat("x", MaxGitDiffFile+1)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	git("add", ".")
+	git("commit", "-m", "Large original")
+	if err := os.WriteFile(file, []byte("small replacement"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	git("add", ".")
+	git("commit", "-m", "Small replacement")
+	output, err := exec.Command("git", "-C", root, "rev-parse", "HEAD").Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hash := strings.TrimSpace(string(output))
+	if _, _, err := ReadGitCommitDiff(context.Background(), "", root, "large.txt", hash); !errors.Is(err, ErrGitFileSize) {
+		t.Fatal("large historical parent bypassed the file-size limit", err)
+	}
+	reader := GitReader{Remote: func(_ context.Context, _, _ string, output io.Writer) error {
+		_, err := io.WriteString(output, strings.Repeat("+line\n", 2001))
+		return err
+	}}
+	patch, truncated, err := reader.CommitDiff(context.Background(), "fixture", "/project", "file.txt", hash)
+	if err != nil || !truncated || strings.Count(patch, "\n") != 2000 {
+		t.Fatal("historical patch line limit was not applied", len(patch), truncated, err)
 	}
 }

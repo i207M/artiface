@@ -71,3 +71,38 @@ func TestGitCommitUnavailableHostKeysAndConcurrency(t *testing.T) {
 		t.Fatal("commit bypassed concurrency limit", w.Code)
 	}
 }
+
+func TestHistoricalDiffValidationAndSourceChanges(t *testing.T) {
+	app, _ := newTestApp(t)
+	cookie, _ := signIn(t, app)
+	hash := strings.Repeat("a", 40)
+	base := "/api/git/diff?host=test&root=artifacts&path=gone.txt&commit="
+	calls := 0
+	app.git.readCommitDiff = func(_ context.Context, _, _, path, commit string) (string, bool, error) {
+		calls++
+		if path != "gone.txt" || commit != hash {
+			t.Fatal("wrong historical diff identity", path, commit)
+		}
+		return "-old committed content", false, nil
+	}
+	for _, invalid := range []string{"HEAD", "not-a-commit", hash + "%5E1"} {
+		if w := request(app, "GET", base+invalid, nil, cookie, ""); w.Code != 400 {
+			t.Fatal("invalid revision accepted", w.Code)
+		}
+	}
+	if calls != 0 {
+		t.Fatal("invalid revision reached Git")
+	}
+	if w := request(app, "GET", base+hash, nil, cookie, ""); w.Code != 200 || !strings.Contains(w.Body.String(), "old committed content") {
+		t.Fatal("historical file incorrectly required a working-tree file", w.Code, w.Body.String())
+	}
+	app.git.readCommitDiff = func(context.Context, string, string, string, string) (string, bool, error) {
+		app.hostsMu.Lock()
+		app.cfg.Hosts[0].Roots[0].Path += "-moved"
+		app.hostsMu.Unlock()
+		return "stale historical diff", false, nil
+	}
+	if w := request(app, "GET", base+hash, nil, cookie, ""); w.Code != 409 || strings.Contains(w.Body.String(), "stale historical diff") {
+		t.Fatal("source change leaked a historical diff", w.Code, w.Body.String())
+	}
+}

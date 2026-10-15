@@ -50,7 +50,9 @@
 .git-commit-folder > summary:hover { background: var(--hover); }
 .git-commit-folder > summary:focus-visible { outline-offset: -2px; }
 .git-commit-folder[open] > summary .git-tree-disclosure { transform: rotate(90deg); }
-.git-commit-file { padding-left: 24px; }
+.git-commit-file { padding-left: 24px; cursor: pointer; border-radius: 4px; }
+.git-commit-file:hover { background: var(--hover); }
+.git-commit-file:focus-visible { outline-offset: -2px; }
 .git-commit-file-name { min-width: 0; white-space: pre-wrap; }
 .git-commit-file > .git-badge { margin-left: auto; }
 .git-commit-metadata { margin-top: 10px; border-top: 1px solid var(--border); }

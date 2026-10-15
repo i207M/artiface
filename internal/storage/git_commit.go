@@ -81,3 +81,35 @@ func (g GitReader) Commit(ctx context.Context, target, root, hash string) (GitCo
 	}
 	return result, nil
 }
+
+func ReadGitCommitDiff(ctx context.Context, target, root, rel, hash string) (string, bool, error) {
+	return (GitReader{}).CommitDiff(ctx, target, root, rel, hash)
+}
+
+func (g GitReader) CommitDiff(ctx context.Context, target, root, rel, hash string) (string, bool, error) {
+	if rel == "" || !gitObjectID(hash) {
+		return "", false, ErrForbidden
+	}
+	data, err := g.run(ctx, target, root, "commit-diff", rel, MaxGitPatch, strings.ToLower(hash))
+	truncated := errors.Is(err, ErrGitLimit) && len(data) > 0
+	if truncated {
+		if end := bytes.LastIndexByte(data, '\n'); end >= 0 {
+			data = data[:end+1]
+		}
+		err = nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	lines := 0
+	for index, value := range data {
+		if value == '\n' {
+			lines++
+			if lines == 2000 && index+1 < len(data) {
+				data, truncated = data[:index+1], true
+				break
+			}
+		}
+	}
+	return strings.ToValidUTF8(string(data), "\uFFFD"), truncated, nil
+}

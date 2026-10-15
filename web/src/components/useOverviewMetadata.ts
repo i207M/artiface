@@ -12,7 +12,7 @@ export interface OverviewMetadata {
 export function useOverviewMetadata(files: FileLocation[], active: boolean, seconds: number) {
   const [metadata, setMetadata] = useState<Record<string, OverviewMetadata>>({})
   // A file and its diff share one metadata request for the physical file.
-  const locations = JSON.stringify([...new Map(files.filter(file => file.view !== 'history').map(({ host, root, path }) => {
+  const locations = JSON.stringify([...new Map(files.filter(file => file.view !== 'history' && !file.commit).map(({ host, root, path }) => {
     const file = { host, root, path }
     return [tabKey(file), file]
   })).values()])

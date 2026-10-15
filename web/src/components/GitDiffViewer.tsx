@@ -30,7 +30,7 @@ export default function GitDiffViewer({ location, active, focusRequest, copied, 
   const [layout, setLayout] = useState<'inline' | 'split' | null>(null)
   const [wide, setWide] = useState(false)
   const shownLayout = layout ?? (wide ? 'split' : 'inline')
-  const url = apiURL('git/diff', location)
+  const url = apiURL('git/diff', location) + (location.commit ? `&commit=${encodeURIComponent(location.commit)}` : '')
   useBrowseReaderFocusTarget(content, active ? focusRequest : null)
   useEffect(() => {
     const element = content.current
@@ -78,7 +78,7 @@ export default function GitDiffViewer({ location, active, focusRequest, copied, 
     <div ref={content} className="preview-content content-diff" tabIndex={-1}>
       {error ? <ErrorState title="Couldn’t load this diff" message={error} retry={retryable ? () => setAttempt(value => value + 1) : undefined} />
         : !data ? <Loading message="Loading diff…" />
-          : <div className="git-diff-content" tabIndex={0} aria-label="Git diff" aria-busy={busy}><GitDiffContent patch={data.patch} layout={shownLayout} /></div>}
+          : <div className="git-diff-content" tabIndex={0} aria-label="Git diff" aria-busy={busy}><GitDiffContent patch={data.patch} layout={shownLayout} commit={location.commit} /></div>}
     </div>
   </section>
 }

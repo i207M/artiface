@@ -12,6 +12,7 @@ export function readLocation(): Location {
     kind: kind === 'directory' || kind === 'file' || kind === 'auto' || kind === 'overview' || kind === 'settings' || kind === 'add-project'
       ? kind : 'overview',
     ...(view ? { view } : {}),
+    ...(view === 'diff' && params.get('commit') ? { commit: params.get('commit')!.toLowerCase() } : {}),
   }
 }
 
@@ -22,6 +23,7 @@ export function locationHash(location: Location) {
     path: location.view === 'history' && location.kind === 'file' ? '' : location.path,
     kind: location.kind,
     ...(location.kind === 'file' && location.view ? { view: location.view } : {}),
+    ...(location.kind === 'file' && location.view === 'diff' && location.commit ? { commit: location.commit } : {}),
   })}`
 }
 
@@ -58,7 +60,7 @@ export function fileName(path: string) {
 
 export function fileTabName(file: FileLocation, fullPath = false) {
   if (file.view === 'history') return 'Git history'
-  return `${fullPath ? file.path : fileName(file.path)}${file.view === 'diff' ? ' · Diff' : ''}`
+  return `${fullPath ? file.path : fileName(file.path)}${file.view === 'diff' ? `${file.commit ? ` · ${file.commit.slice(0, 8)}` : ''} · Diff` : ''}`
 }
 
 export function extension(path: string) {

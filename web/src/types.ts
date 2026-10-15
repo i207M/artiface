@@ -40,6 +40,7 @@ export interface FileLocation {
   root: string
   path: string
   view?: 'diff' | 'history'
+  commit?: string
 }
 
 export interface TextResponse {

@@ -5,7 +5,7 @@ import type { FileLocation, Host, Location } from '../types'
 import { browseSources, createBrowseDirectories } from './browseDirectories'
 
 const storageKey = 'artiface.workspace.v1'
-export interface OpenProject { host: string; root: string; directory: string | null; activePath: string | null; activeView?: FileLocation['view']; expanded: boolean }
+export interface OpenProject { host: string; root: string; directory: string | null; activePath: string | null; activeView?: FileLocation['view']; activeCommit?: string; expanded: boolean }
 export interface OpenFile extends FileLocation { autoRefreshPaused: boolean }
 interface WorkspaceSession { projects: OpenProject[]; tabs: OpenFile[] }
 type ProjectRef = Pick<OpenProject, 'host' | 'root'>
@@ -14,7 +14,7 @@ interface SharedProjects { projects: ProjectRef[]; sourcesRevision: string }
 interface ProjectChange { project: ProjectRef; open: boolean }
 const empty: WorkspaceSession = { projects: [], tabs: [] }
 export const projectKey = (project: { host: string; root: string }) => JSON.stringify([project.host, project.root])
-export const tabKey = (tab: FileLocation) => JSON.stringify([tab.host, tab.root, tab.path, ...(tab.view ? [tab.view] : [])])
+export const tabKey = (tab: FileLocation) => JSON.stringify([tab.host, tab.root, tab.path, ...(tab.view ? [tab.view] : []), ...(tab.view === 'diff' && tab.commit ? [tab.commit] : [])])
 const validProject = (value: unknown): value is { host: string; root: string } =>
   Boolean(value && typeof value === 'object' && 'host' in value && typeof value.host === 'string' && value.host &&
     'root' in value && typeof value.root === 'string' && value.root)
@@ -37,20 +37,24 @@ function readSession(storageKey: string): WorkspaceSession {
       const view = 'view' in tab ? tab.view : undefined
       if (view !== undefined && view !== 'diff' && view !== 'history') continue
       if (view === 'history' ? tab.path !== '' : !tab.path) continue
+      const commit = 'commit' in tab ? tab.commit : undefined
+      if (commit !== undefined && (view !== 'diff' || typeof commit !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(commit))) continue
       if (tabs.some(item => tabKey(item) === tabKey(tab as FileLocation))) continue
-      tabs.push({ host: tab.host, root: tab.root, path: tab.path, ...(view ? { view } : {}), autoRefreshPaused: 'autoRefreshPaused' in tab && tab.autoRefreshPaused === true })
+      tabs.push({ host: tab.host, root: tab.root, path: tab.path, ...(view ? { view } : {}), ...(commit ? { commit } : {}), autoRefreshPaused: 'autoRefreshPaused' in tab && tab.autoRefreshPaused === true })
     }
     const projects: OpenProject[] = []
     for (const project of Array.isArray(value.projects) ? value.projects : []) {
       if (!validProject(project) || projects.some(item => projectKey(item) === projectKey(project))) continue
       const activePath = 'activePath' in project ? project.activePath : null
       const activeView = 'activeView' in project && (project.activeView === 'diff' || project.activeView === 'history') ? project.activeView : undefined
+      const activeCommit = activeView === 'diff' && 'activeCommit' in project && typeof project.activeCommit === 'string' ? project.activeCommit : undefined
       projects.push({
         host: project.host, root: project.root,
         directory: 'directory' in project && typeof project.directory === 'string' ? project.directory : null,
         expanded: !('expanded' in project) || project.expanded !== false,
-        activePath: typeof activePath === 'string' && tabs.some(tab => projectKey(tab) === projectKey(project) && tab.path === activePath && tab.view === activeView) ? activePath : null,
+        activePath: typeof activePath === 'string' && tabs.some(tab => projectKey(tab) === projectKey(project) && tab.path === activePath && tab.view === activeView && tab.commit === activeCommit) ? activePath : null,
         ...(activeView ? { activeView } : {}),
+        ...(activeCommit ? { activeCommit } : {}),
       })
     }
     return { projects, tabs: tabs.filter(tab => projects.some(project => projectKey(project) === projectKey(tab))) }
@@ -208,14 +212,14 @@ export function useWorkspaceTabs(hosts: Host[] | null, userID?: string) {
       const previous = current.projects.find(project => projectKey(project) === projectKey(location))
       const savedDirectory = directories.get(location, directorySources.current ?? new Map())
       const project: OpenProject = previous
-        ? { ...previous, directory: previous.directory ?? savedDirectory ?? (location.kind === 'file' ? parentPath(location.path) : location.path), ...(!background ? location.kind === 'file' ? { activePath: location.path, activeView: location.view } : { activePath: null, activeView: undefined, directory: location.path } : {}) }
-        : { host: location.host, root: location.root, directory: location.kind === 'file' ? savedDirectory ?? parentPath(location.path) : location.path, activePath: !background && location.kind === 'file' ? location.path : null, activeView: !background && location.kind === 'file' ? location.view : undefined, expanded: true }
+        ? { ...previous, directory: previous.directory ?? savedDirectory ?? (location.kind === 'file' ? parentPath(location.path) : location.path), ...(!background ? location.kind === 'file' ? { activePath: location.path, activeView: location.view, activeCommit: location.commit } : { activePath: null, activeView: undefined, activeCommit: undefined, directory: location.path } : {}) }
+        : { host: location.host, root: location.root, directory: location.kind === 'file' ? savedDirectory ?? parentPath(location.path) : location.path, activePath: !background && location.kind === 'file' ? location.path : null, activeView: !background && location.kind === 'file' ? location.view : undefined, activeCommit: !background && location.kind === 'file' ? location.commit : undefined, expanded: true }
       const newFile = location.kind === 'file' && !current.tabs.some(tab => tabKey(tab) === tabKey(location))
-      if (previous && previous.activePath === project.activePath && previous.activeView === project.activeView && previous.directory === project.directory && !newFile) return current
+      if (previous && previous.activePath === project.activePath && previous.activeView === project.activeView && previous.activeCommit === project.activeCommit && previous.directory === project.directory && !newFile) return current
       return {
         ...current,
         projects: previous ? current.projects.map(item => projectKey(item) === projectKey(project) ? project : item) : [...current.projects, project],
-        tabs: newFile ? [...current.tabs, { host: location.host, root: location.root, path: location.path, ...(location.view ? { view: location.view } : {}), autoRefreshPaused: false }] : current.tabs,
+        tabs: newFile ? [...current.tabs, { host: location.host, root: location.root, path: location.path, ...(location.view ? { view: location.view } : {}), ...(location.commit ? { commit: location.commit } : {}), autoRefreshPaused: false }] : current.tabs,
       }
     })
     if (opened) share(location, true)
@@ -234,9 +238,9 @@ export function useWorkspaceTabs(hosts: Host[] | null, userID?: string) {
         ...current,
         tabs,
         projects: current.projects.map(project => {
-          if (projectKey(project) !== projectKey(tab) || project.activePath !== tab.path || project.activeView !== tab.view) return project
+          if (projectKey(project) !== projectKey(tab) || project.activePath !== tab.path || project.activeView !== tab.view || project.activeCommit !== tab.commit) return project
           const next = tabs.find(item => projectKey(item) === projectKey(project))
-          return { ...project, activePath: next?.path ?? null, activeView: next?.view }
+          return { ...project, activePath: next?.path ?? null, activeView: next?.view, activeCommit: next?.commit }
         }),
       }
     })
