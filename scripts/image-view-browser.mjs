@@ -22,7 +22,7 @@ const bundle = await rolldown({
     resolveId(id) {
       if (id === entry) return id
       if (id.endsWith('.css') || id.includes('.svg?')) return '\0fixture-asset'
-      if (['./PDFViewer', './MarkdownViewer', './SourceViewer', './CSVViewer'].includes(id)) return '\0fixture-reader'
+      if (['./PDFViewer', './GitPDFPreview', './MarkdownViewer', './SourceViewer', './CSVViewer'].includes(id)) return '\0fixture-reader'
     },
     load(id) {
       if (id === '\0fixture-asset') return 'export default ""'
