@@ -25,13 +25,14 @@ test:
 	node scripts/csv-test.mjs
 	node scripts/git-view-test.mjs
 
-browser-test:
+browser-test: web-build
 	node scripts/ssh-host-key-regression.mjs
 	node scripts/ssh-host-form-regression.mjs
 	node scripts/ssh-removal-regression.mjs
 	node scripts/file-refresh.mjs
 	node scripts/copy-path-regression.mjs
 	node scripts/git-browser-regression.mjs
+	node scripts/git-media-browser-regression.mjs
 	node scripts/reader-cache-regression.mjs
 	node scripts/login-regression.mjs
 	node scripts/markdown-reader.mjs

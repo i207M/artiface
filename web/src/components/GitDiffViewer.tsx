@@ -7,9 +7,11 @@ import { ErrorState, Loading, ShareButton } from './Common'
 import { useBrowseReaderFocusTarget } from './useBrowseReaderFocus'
 import type { BrowseReaderFocusRequest } from './useBrowseReaderFocus'
 import GitDiffContent from './GitDiffContent'
+import GitMediaDiff from './GitMediaDiff'
+import type { GitMedia } from './GitMediaDiff'
 import './git.css'
 
-interface Diff { patch: string; truncated: boolean }
+interface Diff { patch: string; truncated: boolean; media?: GitMedia }
 
 export default function GitDiffViewer({ location, active, focusRequest, copied, onCopyLink, onCopyPath, onExpand }: {
   location: FileLocation
@@ -75,10 +77,11 @@ export default function GitDiffViewer({ location, active, focusRequest, copied, 
       </div>
     </div>
     {data?.truncated && <p className="notice git-diff-notice" role="status">Partial diff: preview limited to 128 KiB, 2,000 lines, or 8 seconds.</p>}
-    <div ref={content} className="preview-content content-diff" tabIndex={-1}>
+    <div ref={content} className={`preview-content content-diff${data?.media ? ' content-media-diff' : ''}`} tabIndex={-1}>
       {error ? <ErrorState title="Couldn’t load this diff" message={error} retry={retryable ? () => setAttempt(value => value + 1) : undefined} />
         : !data ? <Loading message="Loading diff…" />
-          : <div className="git-diff-content" tabIndex={0} aria-label="Git diff" aria-busy={busy}><GitDiffContent patch={data.patch} layout={shownLayout} commit={location.commit} /></div>}
+          : data.media ? <GitMediaDiff key={loaded.current} media={data.media} name={location.path} layout={shownLayout} commit={location.commit} active={active} />
+            : <div className="git-diff-content" tabIndex={0} aria-label="Git diff" aria-busy={busy}><GitDiffContent patch={data.patch} layout={shownLayout} commit={location.commit} /></div>}
     </div>
   </section>
 }

@@ -44,13 +44,15 @@ type gitService struct {
 	readHistory    func(context.Context, string, string, int) (storage.GitHistory, error)
 	readCommit     func(context.Context, string, string, string) (storage.GitCommitDetails, error)
 	readCommitDiff func(context.Context, string, string, string, string) (string, bool, error)
+	readDiffFiles  func(context.Context, string, string, string, string) (storage.GitFileVersions, error)
 }
 
 func newGitService() *gitService {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &gitService{cache: make(map[gitSource]gitStatusResponse), pending: make(map[gitSource]*gitCall),
 		slots: make(chan struct{}, 2), ctx: ctx, cancel: cancel, now: time.Now,
-		read: storage.ReadGitStatus, readDiff: storage.ReadGitDiff, readHistory: storage.ReadGitHistory, readCommit: storage.ReadGitCommit, readCommitDiff: storage.ReadGitCommitDiff}
+		read: storage.ReadGitStatus, readDiff: storage.ReadGitDiff, readHistory: storage.ReadGitHistory, readCommit: storage.ReadGitCommit, readCommitDiff: storage.ReadGitCommitDiff,
+		readDiffFiles: storage.ReadGitDiffFiles}
 }
 
 func (g *gitService) status(parent context.Context, source gitSource, force bool) (gitStatusResponse, error) {
@@ -260,7 +262,14 @@ func (a *App) gitDiff(w http.ResponseWriter, r *http.Request) {
 	var patch string
 	var truncated bool
 	var err error
-	if commit == "" {
+	mediaType := gitMediaType(rel)
+	var media storage.GitFileVersions
+	if mediaType != "" {
+		media, err = a.git.readDiffFiles(ctx, host.Target, root.Path, rel, commit)
+		if err == nil && commit == "" {
+			media.After, err = a.gitWorkingFile(ctx, source, rel)
+		}
+	} else if commit == "" {
 		patch, truncated, err = a.git.readDiff(ctx, host.Target, root.Path, rel)
 	} else {
 		patch, truncated, err = a.git.readCommitDiff(ctx, host.Target, root.Path, rel, commit)
@@ -289,6 +298,12 @@ func (a *App) gitDiff(w http.ResponseWriter, r *http.Request) {
 			message = "Diffs requiring custom filters or partial-clone fetching are unavailable."
 		}
 		fail(w, http.StatusUnprocessableEntity, message)
+		return
+	}
+	if mediaType != "" {
+		respond(w, http.StatusOK, map[string]any{"media": map[string]any{
+			"type": mediaType, "before": media.Before, "after": media.After,
+		}})
 		return
 	}
 	respond(w, http.StatusOK, map[string]any{"patch": patch, "truncated": truncated})

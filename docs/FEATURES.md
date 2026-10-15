@@ -9,6 +9,7 @@ Browse and read artifacts from local and SSH machines in one browser workspace.
 - **Flexible browsing:** Use list or icon view, sort by name, type, size, or modification time, and filter by filename or file type.
   Browse paths and preferences are remembered, with an option to include files from subfolders.
 - **Git history and changes:** Browse a commit graph with branch and tag labels, and compare historical or working-tree file changes in inline or side-by-side diff tabs.
+  Images and PDFs show visual previews: the new version inline, or both versions side by side.
 - **Live updates:** Refresh files automatically, pause individual readers, or refresh manually.
   Cached previews and reading positions help you switch tabs without starting over.
 - **Sharing and downloads:** Copy a file path, share an app link, or download the original file.

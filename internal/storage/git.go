@@ -150,6 +150,40 @@ case "$2" in
       g diff-tree --root -p --no-commit-id --no-ext-diff --no-textconv --no-renames --ignore-submodules=none --submodule=short --relative --no-color "$4" -- "$3" 2>/dev/null
     fi
     ;;
+  diff-files)
+    rel=$3
+    after=$4
+    if [ -n "$after" ]; then
+      [ "$(g cat-file -t "$after" 2>/dev/null)" = commit ] || exit 26
+      if [ -n "$prefix" ]; then
+        scoped=$(g log -1 --full-history --simplify-merges --parents --no-notes --no-show-signature --format=%H "$after" -- . 2>/dev/null) || exit 24
+        [ "$scoped" = "$after" ] || exit 26
+      fi
+      before=$(g rev-parse --verify "$after^1" 2>/dev/null) || before=
+    else
+      before=$(g rev-parse --verify HEAD 2>/dev/null) || before=
+    fi
+    for revision in "$before" "$after"; do
+      if [ -z "$revision" ]; then
+        printf 'missing 0\000'
+        continue
+      fi
+      entry=$(g ls-tree "$revision" -- "$rel" 2>/dev/null) || exit 24
+      if [ -z "$entry" ]; then
+        printf 'missing 0\000'
+        continue
+      fi
+      case "$entry" in
+        "100644 "*|"100755 "*) ;;
+        *) printf 'unsupported 0\000'; continue ;;
+      esac
+      object="$revision:$prefix$rel"
+      size=$(g cat-file -s "$object" 2>/dev/null) || exit 24
+      [ "$size" -le 8388608 ] || exit 25
+      printf 'file %s\000' "$size"
+      g cat-file blob "$object" 2>/dev/null || exit 24
+    done
+    ;;
   *) exit 24 ;;
 esac
 `

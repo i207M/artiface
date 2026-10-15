@@ -28,7 +28,7 @@ async function buildWorkspace() {
       name: 'workspace-sources-fixture',
       resolveId(id) {
         if (id === 'fixture:workspace-sources') return '\0fixture'
-        if (id === './FilePreview') return '\0reader'
+        if (id === './FilePreview' || id === './GitPDFPreview') return '\0reader'
         if (id.endsWith('.css')) return '\0css'
         if (id.includes('.svg?')) return '\0logo'
       },

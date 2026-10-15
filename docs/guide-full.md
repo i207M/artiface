@@ -163,6 +163,10 @@ A file and its diff can stay open together in the sidebar and Overview.
 Retained diff tabs reuse their content; **Refresh diff** checks for newer changes.
 Choose **Inline** or **Side by side** in the diff toolbar to compare changes with line numbers.
 Wide panes start side by side; narrow panes start inline.
+Images and PDFs have visual previews in both working-tree and historical diffs.
+For these files, **Inline** shows only the new version; **Side by side** shows the previous and new versions.
+Use image zoom or PDF page and zoom controls to inspect each version, or download it from its heading.
+Deleted files show a deletion message in Inline mode; switch to Side by side to view their previous contents.
 
 Open the Git menu in Browse and choose **View Git history** for a separate commit graph tab.
 The graph includes local branches, remote-tracking branches, tags, and HEAD without fetching from remotes.
@@ -180,9 +184,10 @@ If branch tips change between pages, refresh before loading more.
 Projects rooted in a repository subdirectory show history affecting that project.
 History tabs remain available alongside files and diffs and are restored on reload.
 
-Diffs combine staged and unstaged changes against the last commit, with an empty baseline for untracked files or repositories without a commit.
+Working-tree diffs combine staged and unstaged changes against the last commit, with an empty baseline for untracked files or repositories without a commit.
 They are read-only and load on request; no staging, commits, checkout, hooks, external diff tools, or network fetches run.
-Binary changes are reported as text rather than historical image/PDF previews.
+Visual previews support PNG, JPEG, GIF, WebP, AVIF, BMP, ICO, SVG, and PDF files.
+Other binary changes retain Git's text summary.
 Repositories needing file filters, such as Git LFS, or partial-clone fetching are excluded.
 
 Disable status globally under **Settings → Appearance → Browse**, or per project under **Settings → Sources**.
@@ -195,7 +200,8 @@ The panel explains the pause and offers **Try again**.
 | Status cache | 30 seconds between normal checks; browsing loads independently. |
 | Slow or large status | Pauses after 8 seconds, over 2,000 changes, or excess metadata output. |
 | Diff input | Skipped if either file version exceeds 8 MiB. |
-| Diff output | Partial-preview notice at 128 KiB, 2,000 lines, or 8 seconds. |
+| Text diff output | Partial-preview notice at 128 KiB, 2,000 lines, or 8 seconds. |
+| Visual diffs | Up to 8 MiB per version, with an 8-second read timeout; incomplete files are never rendered. |
 | History | 100 commits per page, with a 2 MiB output limit and an 8-second timeout per read. |
 | Commit changes | Up to 2,000 changed files per preview, with the same 2 MiB and 8-second read limits. |
 

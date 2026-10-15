@@ -24,7 +24,7 @@ const bundle = await rolldown({
     resolveId(id) {
       if (id === 'fixture:copy-path') return '\0fixture.tsx'
       if (id.endsWith('.css') || id.includes('.svg?')) return '\0asset'
-      if (id === './PDFViewer') return '\0pdf.tsx'
+      if (id === './PDFViewer' || id === './GitPDFPreview') return '\0pdf.tsx'
       if (id === './useSourceHighlight') return '\0highlight'
     },
     load(id) {

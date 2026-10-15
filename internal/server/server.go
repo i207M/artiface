@@ -63,6 +63,7 @@ func WithSSHCredentials(runtime *sshvault.Runtime) Option {
 		a.git.read, a.git.readDiff, a.git.readHistory = reader.Status, reader.Diff, reader.History
 		a.git.readCommit = reader.Commit
 		a.git.readCommitDiff = reader.CommitDiff
+		a.git.readDiffFiles = reader.DiffFiles
 	}
 }
 

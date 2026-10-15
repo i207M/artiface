@@ -21,7 +21,7 @@ const bundle = await rolldown({
     name: 'project-reorder',
     resolveId(id) {
       if (id === 'fixture:project-reorder') return '\0fixture.tsx'
-      if (id === './FilePreview') return '\0reader.tsx'
+      if (id === './FilePreview' || id === './GitPDFPreview') return '\0reader.tsx'
       if (id.endsWith('.css') || id.includes('.svg?')) return '\0asset'
     },
     load(id) {

@@ -27,7 +27,7 @@ const bundle = await rolldown({
       if (id === 'fixture:sidebar-resize') return '\0fixture'
       if (id.endsWith('.css')) return '\0css'
       if (id.includes('.svg?')) return '\0logo'
-      if (id === './PDFViewer') return '\0pdf'
+      if (id === './PDFViewer' || id === './GitPDFPreview') return '\0pdf'
       if (id === './useSourceHighlight') return '\0highlight'
     },
     async load(id) {

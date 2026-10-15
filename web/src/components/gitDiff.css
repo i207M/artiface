@@ -16,6 +16,21 @@
 .git-diff-content .git-diff-code > .git-no-newline { display: block; padding: 0; color: var(--muted); font-style: italic; font-size: 11px; }
 .git-diff-content .git-diff-metadata { min-width: 0; width: auto; margin: 0; padding: 10px 12px; font: inherit; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); }
 .diff-empty { background: repeating-linear-gradient(135deg, var(--surface-alt), var(--surface-alt) 3px, var(--surface) 3px, var(--surface) 6px); }
+.content-media-diff { display: flex; flex-direction: column; overflow: hidden; }
+.git-media-diff { display: grid; grid-template-columns: minmax(0, 1fr); flex: 1; min-height: 0; min-width: 0; }
+.git-media-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); overflow: auto; }
+.git-media-version { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.git-media-split > .git-media-version + .git-media-version { border-left: 1px solid var(--border); }
+.git-media-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--control-height); padding: 4px 10px; background: var(--surface-alt); border-bottom: 1px solid var(--border); font-size: var(--small); }
+.git-media-heading strong { font-weight: 500; overflow-wrap: anywhere; }
+.git-media-heading a { flex-shrink: 0; }
+.git-media-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px; padding: 3px; border-bottom: 1px solid var(--border); background: var(--surface); font-size: var(--small); }
+.git-media-controls select { width: auto; min-width: 0; max-width: 85px; padding-inline: 4px; }
+.git-media-empty { margin: auto; padding: 24px; color: var(--muted); text-align: center; overflow-wrap: anywhere; }
+.git-media-version > .error-state { overflow: auto; }
+.git-pdf-page { display: flex; align-items: center; gap: 4px; }
+.git-pdf-page input { width: 4em; min-width: 0; padding-inline: 3px; text-align: center; }
+.git-pdf-page span { white-space: nowrap; }
 @media (max-width: 700px) {
   .git-inline-row { grid-template-columns: 3em 3em 1.2em minmax(0, 1fr); }
 }

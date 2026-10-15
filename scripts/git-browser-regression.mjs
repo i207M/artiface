@@ -47,7 +47,7 @@ const bundle = await rolldown({
       if (id === 'fixture:git') return '\0fixture.tsx'
       if (id.endsWith('.css')) return '\0asset'
       if (id.includes('.svg?')) return '\0logo'
-      if (id === './FilePreview') return '\0reader.tsx'
+      if (id === './FilePreview' || id === './GitPDFPreview') return '\0reader.tsx'
     },
     load(id) {
       if (id === '\0asset') return 'export default ""'
