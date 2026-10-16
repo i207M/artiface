@@ -133,7 +133,7 @@ export default function GitHistoryViewer({ location, active, focusRequest, copie
                     }}
                     title={`${item.message.split('\n')[0]}\n${item.author} · ${modifiedTime(item.date)}\n${item.hash}`}>
                     <Graph row={graph.rows[index]} width={graphWidth} />
-                    <span className="git-history-subject">{item.refs.length > 0 && <span className="git-history-refs">{item.refs.map(ref => <span className={`git-ref${ref.startsWith('HEAD') ? ' is-head' : ''}`} key={ref}>{ref}</span>)}</span>}<span>{item.message.split('\n')[0] || '(No commit message)'}</span></span>
+                    <span className="git-history-subject">{item.refs.length > 0 && <span className="git-history-refs">{item.refs.map(ref => <span className={`git-ref${ref.startsWith('HEAD') ? ' is-head' : ''}`} key={ref} title={ref}>{ref}</span>)}</span>}<span>{item.message.split('\n')[0] || '(No commit message)'}</span></span>
                     <span className="git-history-author">{item.author}</span>
                     <time className="git-history-date" dateTime={item.date}>{relativeTime(item.date)}</time>
                     <span className="git-history-id"><code className="git-history-hash">{item.hash}</code><ChevronRight className="git-history-disclosure" size={14} aria-hidden="true"

@@ -183,6 +183,7 @@ Use **Load older commits** to extend the graph, or **Refresh history** to see ne
 If branch tips change between pages, refresh before loading more.
 Projects rooted in a repository subdirectory show history affecting that project.
 History tabs remain available alongside files and diffs and are restored on reload.
+History rows and expanded files follow your **Compact** or **Comfortable** density setting.
 
 Working-tree diffs combine staged and unstaged changes against the last commit, with an empty baseline for untracked files or repositories without a commit.
 They are read-only and load on request; no staging, commits, checkout, hooks, external diff tools, or network fetches run.
